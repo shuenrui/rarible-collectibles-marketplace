@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import PackRipModal from "@/components/PackRipModal";
+import SellFlowModal from "@/components/SellFlowModal";
 
 const fandoms = [
   { name: "Pokemon", slug: "pokemon", count: "3,201", tone: "bg-[#FEDB02] text-black" },
@@ -17,8 +22,14 @@ const hotLots = [
 ];
 
 export default function Home() {
+  const [packOpen, setPackOpen] = useState(false);
+  const [sellOpen, setSellOpen] = useState(false);
+
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
+      <PackRipModal open={packOpen} onClose={() => setPackOpen(false)} />
+      <SellFlowModal open={sellOpen} onClose={() => setSellOpen(false)} />
+
       <header className="sticky top-0 z-20 border-b-[3px] border-black bg-[#FEDB02] px-4 py-3 md:px-8">
         <div className="mx-auto flex w-full max-w-[1280px] items-center justify-between">
           <div className="font-black tracking-tight text-black md:text-lg">RARIBLE COLLECTIBLES</div>
@@ -28,7 +39,9 @@ export default function Home() {
             </Link>
             <span className="px-3 py-2 text-sm font-bold text-black/70">Drops</span>
             <span className="px-3 py-2 text-sm font-bold text-black/70">Packs</span>
-            <span className="px-3 py-2 text-sm font-bold text-black/70">Sell</span>
+            <button onClick={() => setSellOpen(true)} className="px-3 py-2 text-sm font-bold text-black/70">
+              Sell
+            </button>
             <Link href="/vault" className="px-3 py-2 text-sm font-bold text-black/70">
               Vault
             </Link>
@@ -74,6 +87,12 @@ export default function Home() {
               >
                 Browse Marketplace
               </Link>
+              <button
+                onClick={() => setPackOpen(true)}
+                className="border-2 border-[#FEDB02] bg-transparent px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-[#FEDB02]"
+              >
+                Rip My Pack
+              </button>
             </div>
           </div>
 

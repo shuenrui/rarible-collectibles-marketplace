@@ -1,0 +1,50 @@
+{
+  "name": "collectibles-marketplace",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "courtyard:ingest": "tsx src/scripts/courtyard-ingest.ts",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "courtyard:persist": "tsx src/scripts/courtyard-persist.ts",
+    "seed:mock": "tsx src/scripts/seed-mock.ts",
+    "beezie:base:ingest": "tsx src/scripts/beezie-base-ingest.ts",
+    "courtyard:active:persist": "tsx src/scripts/courtyard-active-persist.ts",
+    "beezie:active:persist": "tsx src/scripts/beezie-active-persist.ts",
+    "phygitals:sales:persist": "tsx src/scripts/phygitals-sales-persist.ts",
+    "phygitals:active:persist": "tsx src/scripts/phygitals-active-persist.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@types/pg": "^8.20.0",
+    "next": "14.2.35",
+    "pg": "^8.21.0",
+    "prisma": "^7.8.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "viem": "^2.50.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.22.3",
+    "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}

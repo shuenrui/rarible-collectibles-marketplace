@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SourcePlatform {
+  phygitals
+  courtyard
+  beezie
+  collector_crypt
+  other
+}
+
+enum CategoryL1 {
+  pokemon
+  sports_cards
+  one_piece
+  yugioh
+  comics
+  sealed_products
+  other
+}
+
+enum ConditionType {
+  graded
+  raw
+  sealed
+  unknown
+}
+
+enum Grader {
+  psa
+  bgs
+  cgc
+  sgc
+  fanatics
+  alt
+  other
+  none
+}
+
+enum GradeNormalized {
+  psa10
+  psa9
+  psa8
+  bgs10
+  bgs95
+  cgc10
+  raw
+  sealed
+  other
+}
+
+enum ListingType {
+  fixed_price
+  auction
+  offer
+}
+
+enum ListingStatus {
+  active
+  sold
+  cancelled
+  expired
+  unknown
+}
+
+enum TokenStandard {
+  erc721
+  erc1155
+  spl
+  other
+}
+
+model CollectibleListing {
+  id               String          @id @default(uuid())
+  sourcePlatform   SourcePlatform
+  sourceListingId  String
+  sourceItemId     String?
+  sourceUrl        String
+
+  title            String
+  description      String?
+  imageUrl         String
+  thumbnailUrl     String?
+  images           Json?
+
+  categoryL1       CategoryL1
+  categoryL2       String?
+  franchise        String?
+  setName          String?
+  cardNumber       String?
+  year             Int?
+
+  conditionType    ConditionType   @default(unknown)
+  grader           Grader          @default(none)
+  gradeValue       String?
+  gradeNormalized  GradeNormalized?
+  gradeLabelRaw    String?
+
+  listingType      ListingType     @default(fixed_price)
+  priceAmount      Decimal         @db.Decimal(24, 8)
+  priceCurrency    String
+  priceUsd         Decimal?        @db.Decimal(24, 8)
+  lastPriceUpdateAt DateTime
+
+  chainId          Int?
+  contractAddress  String?
+  tokenId          String?
+  tokenStandard    TokenStandard?
+
+  vaulted          Boolean         @default(false)
+  redeemable       Boolean         @default(false)
+  authProvider     String?
+
+  listingStatus    ListingStatus   @default(active)
+  listedAt         DateTime?
+  soldAt           DateTime?
+
+  sellerAddress    String?
+  sellerHandle     String?
+  sellerVerified   Boolean         @default(false)
+
+  syncConfidence   Int             @default(50)
+  dataQualityFlags Json?
+  rawSourcePayload Json?
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  syncedAt         DateTime        @default(now())
+
+  @@unique([sourcePlatform, sourceListingId])
+  @@index([categoryL1, gradeNormalized, priceUsd, listingStatus])
+  @@index([chainId, contractAddress, tokenId])
+}

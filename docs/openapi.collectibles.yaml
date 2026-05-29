@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: Collectibles Browse API
+  version: 0.1.0
+paths:
+  /api/collectibles/listings:
+    get:
+      summary: List normalized collectible listings
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Single value or CSV
+        - in: query
+          name: grade
+          schema:
+            type: string
+          description: Single value or CSV
+        - in: query
+          name: min_price_usd
+          schema:
+            type: number
+        - in: query
+          name: max_price_usd
+          schema:
+            type: number
+        - in: query
+          name: source_platform
+          schema:
+            type: string
+        - in: query
+          name: listing_status
+          schema:
+            type: string
+            default: active
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc, relevance]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            default: 24
+      responses:
+        '200':
+          description: Listing page with pagination metadata
+  /api/collectibles/facets:
+    get:
+      summary: Get facet counts for current filter set
+      responses:
+        '200':
+          description: Category, grade, platform, and price range facets
+  /api/collectibles/listings/{id}:
+    get:
+      summary: Get one listing detail with provenance fields
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full normalized listing
+        '404':
+          description: Not found

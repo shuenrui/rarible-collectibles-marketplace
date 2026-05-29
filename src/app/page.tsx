@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 const fandoms = [
-  { name: "Pokemon", count: "3,201", tone: "bg-[#FEDB02] text-black" },
-  { name: "Marvel", count: "612", tone: "bg-black text-[#FEDB02]" },
-  { name: "Baseball", count: "2,104", tone: "bg-[#0066FF] text-white" },
-  { name: "Yu-Gi-Oh", count: "612", tone: "bg-[#FF3B70] text-white" },
-  { name: "NBA", count: "847", tone: "bg-[#0A0A0A] text-white" },
-  { name: "One Piece", count: "389", tone: "bg-[#00B574] text-white" },
+  { name: "Pokemon", slug: "pokemon", count: "3,201", tone: "bg-[#FEDB02] text-black" },
+  { name: "Marvel", slug: "comics", count: "612", tone: "bg-black text-[#FEDB02]" },
+  { name: "Baseball", slug: "sports_cards", count: "2,104", tone: "bg-[#0066FF] text-white" },
+  { name: "Yu-Gi-Oh", slug: "yugioh", count: "612", tone: "bg-[#FF3B70] text-white" },
+  { name: "NBA", slug: "sports_cards", count: "847", tone: "bg-[#0A0A0A] text-white" },
+  { name: "One Piece", slug: "one_piece", count: "389", tone: "bg-[#00B574] text-white" },
 ];
 
 const hotLots = [
@@ -89,7 +89,7 @@ export default function Home() {
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {fandoms.map((fandom) => (
-              <Link key={fandom.name} href="/collectibles" className={`border-2 border-black p-5 ${fandom.tone}`}>
+              <Link key={fandom.name} href={`/collection/${fandom.slug}`} className={`border-2 border-black p-5 ${fandom.tone}`}>
                 <p className="text-2xl font-black">{fandom.name}</p>
                 <p className="mt-2 font-mono text-xs uppercase tracking-[0.2em] opacity-80">{fandom.count} listings</p>
               </Link>

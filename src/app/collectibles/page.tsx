@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type ListingItem = {
@@ -86,7 +87,9 @@ export default function CollectiblesPage() {
         <div className="mx-auto flex max-w-[1480px] items-center justify-between gap-4">
           <div className="font-black tracking-tight text-black md:text-lg">RARIBLE COLLECTIBLES</div>
           <div className="hidden flex-1 md:block">
-            <div className="mx-auto max-w-md bg-black/15 px-4 py-2 text-sm font-semibold text-black/60">Search cards, sets, players...</div>
+            <Link href="/search" className="mx-auto block max-w-md bg-black/15 px-4 py-2 text-sm font-semibold text-black/60">
+              Search cards, sets, players...
+            </Link>
           </div>
           <div className="font-mono text-[10px] font-bold tracking-[0.2em] text-black">COLLECTORS MODE</div>
         </div>
@@ -185,32 +188,36 @@ export default function CollectiblesPage() {
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {items.map((item) => (
               <article key={item.id} className="overflow-hidden border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] transition hover:-translate-y-0.5 hover:shadow-[0_8px_0_#FEDB02]">
-                <div className="relative aspect-[3/4] border-b-2 border-[#0A0A0A] bg-gradient-to-br from-yellow-300 via-yellow-400 to-orange-500">
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://placehold.co/600x800/png?text=No+Image";
-                    }}
-                  />
-                  <div className="absolute left-1 top-1 bg-[#0A0A0A] px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#FEDB02]">
-                    {item.gradeValue || item.gradeNormalized || "UNKNOWN"}
+                <Link href={`/collectibles/lot/${item.id}`}>
+                  <div className="relative aspect-[3/4] border-b-2 border-[#0A0A0A] bg-gradient-to-br from-yellow-300 via-yellow-400 to-orange-500">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = "https://placehold.co/600x800/png?text=No+Image";
+                      }}
+                    />
+                    <div className="absolute left-1 top-1 bg-[#0A0A0A] px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#FEDB02]">
+                      {item.gradeValue || item.gradeNormalized || "UNKNOWN"}
+                    </div>
                   </div>
-                </div>
-                <div className="p-2">
-                  <h3 className="line-clamp-2 min-h-[30px] text-xs font-bold leading-tight">{item.title}</h3>
-                  <div className="mt-2 flex items-end justify-between">
-                    <p className="text-base font-black">
-                      {item.priceUsd ? `$${Number(item.priceUsd).toLocaleString()}` : `${item.priceAmount} ${item.priceCurrency}`}
-                    </p>
-                    <span className="font-mono text-[9px] text-[#6B6B6B]">{item.sourcePlatform}</span>
+                  <div className="p-2">
+                    <h3 className="line-clamp-2 min-h-[30px] text-xs font-bold leading-tight">{item.title}</h3>
+                    <div className="mt-2 flex items-end justify-between">
+                      <p className="text-base font-black">
+                        {item.priceUsd ? `$${Number(item.priceUsd).toLocaleString()}` : `${item.priceAmount} ${item.priceCurrency}`}
+                      </p>
+                      <span className="font-mono text-[9px] text-[#6B6B6B]">{item.sourcePlatform}</span>
+                    </div>
                   </div>
+                </Link>
+                <div className="px-2 pb-2">
                   <a
                     href={item.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-2 block w-full bg-[#0A0A0A] py-2 text-center font-mono text-[10px] font-bold tracking-[0.2em] text-[#FEDB02]"
+                    className="block w-full bg-[#0A0A0A] py-2 text-center font-mono text-[10px] font-bold tracking-[0.2em] text-[#FEDB02]"
                   >
                     BUY NOW
                   </a>

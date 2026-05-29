@@ -29,6 +29,9 @@ export default function Home() {
             <span className="px-3 py-2 text-sm font-bold text-black/70">Drops</span>
             <span className="px-3 py-2 text-sm font-bold text-black/70">Packs</span>
             <span className="px-3 py-2 text-sm font-bold text-black/70">Sell</span>
+            <Link href="/vault" className="px-3 py-2 text-sm font-bold text-black/70">
+              Vault
+            </Link>
           </nav>
         </div>
       </header>

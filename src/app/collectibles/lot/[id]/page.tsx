@@ -79,7 +79,9 @@ export default async function LotPage({ params }: LotPageProps) {
             <Link href="/collectibles" className="px-3 py-2 text-sm font-bold text-black">
               Marketplace
             </Link>
-            <span className="px-3 py-2 text-sm font-bold text-black/70">Vault</span>
+            <Link href="/vault" className="px-3 py-2 text-sm font-bold text-black/70">
+              Vault
+            </Link>
           </nav>
         </div>
       </header>

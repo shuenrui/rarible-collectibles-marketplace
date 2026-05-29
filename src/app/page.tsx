@@ -33,6 +33,14 @@ export default function Home() {
               Vault
             </Link>
           </nav>
+          <div className="flex items-center gap-2 border-2 border-black p-0.5">
+            <Link href="/" className="bg-black px-3 py-1 font-mono text-[10px] font-black tracking-[0.2em] text-[#FEDB02]">
+              COLLECTORS
+            </Link>
+            <Link href="/traders" className="px-3 py-1 font-mono text-[10px] font-bold tracking-[0.2em] text-black/70">
+              TRADERS
+            </Link>
+          </div>
         </div>
       </header>
 

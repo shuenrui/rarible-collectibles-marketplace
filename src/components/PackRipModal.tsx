@@ -36,7 +36,7 @@ export default function PackRipModal({ open, onClose }: PackRipModalProps) {
         ) : (
           <div className="mt-5 border border-white/20 bg-black/30 p-4">
             <p className="font-mono text-[10px] text-white/55">REVEALED CARD</p>
-            <p className="mt-1 text-lg font-black text-[#FEDB02]">Mew Promo '99 · PSA 10</p>
+            <p className="mt-1 text-lg font-black text-[#FEDB02]">Mew Promo &apos;99 · PSA 10</p>
             <p className="text-sm text-white/75">Estimated value: $3,200</p>
           </div>
         )}

@@ -18,12 +18,54 @@ type FeaturedItem = {
 };
 
 const fandoms = [
-  { name: "Pokemon", slug: "pokemon", count: "3,201", tone: "bg-[#FEDB02] text-black" },
-  { name: "Marvel", slug: "comics", count: "612", tone: "bg-black text-[#FEDB02]" },
-  { name: "Baseball", slug: "sports_cards", count: "2,104", tone: "bg-[#0066FF] text-white" },
-  { name: "Yu-Gi-Oh", slug: "yugioh", count: "612", tone: "bg-[#FF3B70] text-white" },
-  { name: "NBA", slug: "sports_cards", count: "847", tone: "bg-[#0A0A0A] text-white" },
-  { name: "One Piece", slug: "one_piece", count: "389", tone: "bg-[#00B574] text-white" },
+  {
+    name: "Pokemon",
+    slug: "pokemon",
+    count: "3,201",
+    tag: "Mythic Electric",
+    banner: "from-[#FFE55D] via-[#FEC700] to-[#FF7E1D]",
+    accent: "text-black",
+  },
+  {
+    name: "Marvel",
+    slug: "comics",
+    count: "612",
+    tag: "Multiverse Arc",
+    banner: "from-[#111] via-[#5A0F23] to-[#C62828]",
+    accent: "text-white",
+  },
+  {
+    name: "Baseball",
+    slug: "sports_cards",
+    count: "2,104",
+    tag: "Hall of Flame",
+    banner: "from-[#09132A] via-[#1452FF] to-[#4FC2FF]",
+    accent: "text-white",
+  },
+  {
+    name: "Yu-Gi-Oh",
+    slug: "yugioh",
+    count: "612",
+    tag: "Shadow Duel",
+    banner: "from-[#1A072E] via-[#4B1F91] to-[#FF3B70]",
+    accent: "text-white",
+  },
+  {
+    name: "NBA",
+    slug: "sports_cards",
+    count: "847",
+    tag: "GOAT Vault",
+    banner: "from-[#0A0A0A] via-[#3A3A3A] to-[#A9A9A9]",
+    accent: "text-white",
+  },
+  {
+    name: "One Piece",
+    slug: "one_piece",
+    count: "389",
+    tag: "Grand Line",
+    banner: "from-[#022C22] via-[#00B574] to-[#85FFD7]",
+    accent: "text-white",
+  },
 ];
 
 const hotLots = [
@@ -168,11 +210,31 @@ export default function Home() {
               All Universes
             </Link>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {fandoms.map((fandom) => (
-              <Link key={fandom.name} href={`/collection/${fandom.slug}`} className={`border-2 border-black p-5 ${fandom.tone}`}>
-                <p className="text-2xl font-black">{fandom.name}</p>
-                <p className="mt-2 font-mono text-xs uppercase tracking-[0.2em] opacity-80">{fandom.count} listings</p>
+              <Link
+                key={fandom.name}
+                href={`/collection/${fandom.slug}`}
+                className="group relative overflow-hidden border-2 border-black bg-black"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${fandom.banner}`} />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(255,255,255,0.3),transparent_40%)]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+
+                <div className="relative flex min-h-[180px] flex-col justify-end p-5 transition-transform duration-200 group-hover:scale-[1.02]">
+                  <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.22em] ${fandom.accent} opacity-85`}>
+                    {fandom.tag}
+                  </p>
+                  <p className={`mt-1 text-3xl font-black leading-none ${fandom.accent}`}>{fandom.name}</p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <p className={`font-mono text-xs uppercase tracking-[0.2em] ${fandom.accent} opacity-80`}>
+                      {fandom.count} listings
+                    </p>
+                    <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.2em] ${fandom.accent}`}>
+                      Enter
+                    </p>
+                  </div>
+                </div>
               </Link>
             ))}
           </div>

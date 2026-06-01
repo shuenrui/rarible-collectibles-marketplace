@@ -425,7 +425,7 @@ export async function ingestPhygitalsActiveListings(options: PhygitalsActiveOpti
         sourcePlatform: "phygitals",
         sourceListingId,
         sourceItemId,
-        sourceUrl: listing.slug ? `${PHYGITALS_SITE_BASE}/marketplace/${listing.slug}` : `${PHYGITALS_SITE_BASE}/marketplace`,
+        sourceUrl: listing.slug ? `${PHYGITALS_SITE_BASE}/card/${listing.slug}` : `${PHYGITALS_SITE_BASE}/marketplace`,
         title,
         description: undefined,
         imageUrl: listing.image || "https://placehold.co/600x800/png?text=No+Image",

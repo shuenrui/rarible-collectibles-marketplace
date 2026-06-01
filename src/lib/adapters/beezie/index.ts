@@ -149,9 +149,8 @@ function slugify(text: string): string {
 }
 
 function buildSourceUrl(item: BeezieDropItem): string {
-  const title = item.metadata?.name?.trim();
-  if (!title) return BEEZIE_MARKETPLACE_URL;
-  return `${BEEZIE_MARKETPLACE_URL}/collectible/${slugify(title)}-${item.tokenId}`;
+  if (!item.tokenId && item.tokenId !== 0) return BEEZIE_MARKETPLACE_URL;
+  return `${BEEZIE_MARKETPLACE_URL}/collectible/${item.tokenId}`;
 }
 
 function toIsoFromBeezieTimestamp(raw?: number | string): string {

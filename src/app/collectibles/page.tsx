@@ -85,7 +85,7 @@ export default function CollectiblesPage() {
     <main className="min-h-screen bg-[#0A0A0A] text-white">
       <header className="sticky top-0 z-20 border-b-[3px] border-black bg-[#FEDB02] px-4 py-3 md:px-8">
         <div className="mx-auto flex max-w-[1480px] items-center justify-between gap-4">
-          <div className="font-black tracking-tight text-black md:text-lg">RARIBLE COLLECTIBLES</div>
+          <Link href="/" className="font-black tracking-tight text-black md:text-lg">RARIBLE COLLECTIBLES</Link>
           <div className="hidden flex-1 md:block">
             <Link href="/search" className="mx-auto block max-w-md bg-black/15 px-4 py-2 text-sm font-semibold text-black/60">
               Search cards, sets, players...

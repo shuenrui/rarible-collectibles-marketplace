@@ -2,6 +2,8 @@ import { ingestCourtyardActiveListings } from "@/lib/adapters/courtyard";
 import { upsertNormalizedListings } from "@/lib/adapters/persist";
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 function asNumber(value: string | null, fallback: number): number {
   if (!value) return fallback;
   const parsed = Number(value);

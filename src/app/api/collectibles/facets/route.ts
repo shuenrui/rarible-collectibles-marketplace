@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const [categories, grades, platforms, priceAgg] = await Promise.all([
     prisma.collectibleListing.groupBy({

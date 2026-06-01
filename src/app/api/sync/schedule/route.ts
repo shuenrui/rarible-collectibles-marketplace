@@ -4,6 +4,8 @@ import { ingestPhygitalsActiveListings, ingestPhygitalsSales } from "@/lib/adapt
 import { upsertNormalizedListings } from "@/lib/adapters/persist";
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 type SyncJobResult = {
   fetched: number;
   upserted: number;

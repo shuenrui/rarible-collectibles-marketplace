@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PackRipModal from "@/components/PackRipModal";
 import SellFlowModal from "@/components/SellFlowModal";
+
+type FeaturedItem = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  priceAmount: string;
+  priceCurrency: string;
+  priceUsd: string | null;
+  sourcePlatform: string;
+  gradeValue: string | null;
+  gradeNormalized: string | null;
+};
 
 const fandoms = [
   { name: "Pokemon", slug: "pokemon", count: "3,201", tone: "bg-[#FEDB02] text-black" },
@@ -24,6 +36,38 @@ const hotLots = [
 export default function Home() {
   const [packOpen, setPackOpen] = useState(false);
   const [sellOpen, setSellOpen] = useState(false);
+  const [featured, setFeatured] = useState<FeaturedItem | null>(null);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadFeatured = async () => {
+      try {
+        const res = await fetch("/api/collectibles/featured", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { item: FeaturedItem | null };
+        if (active) setFeatured(data.item);
+      } finally {
+        if (active) setFeaturedLoading(false);
+      }
+    };
+
+    loadFeatured();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const featuredPrice = useMemo(() => {
+    if (!featured) return "—";
+    if (featured.priceUsd) return `$${Number(featured.priceUsd).toLocaleString()}`;
+    return `${featured.priceAmount} ${featured.priceCurrency}`;
+  }, [featured]);
+
+  const featuredGrade = featured?.gradeValue || featured?.gradeNormalized || "UNKNOWN";
+  const featuredSource = featured?.sourcePlatform?.toUpperCase() || "LISTING";
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
@@ -61,7 +105,7 @@ export default function Home() {
         <div className="mx-auto grid w-full max-w-[1280px] gap-10 lg:grid-cols-[1fr_320px]">
           <div>
             <div className="mb-5 inline-block bg-[#FEDB02] px-4 py-2 font-mono text-xs font-bold tracking-[0.2em] text-black">
-              PSA 10 GEM MINT
+              {featuredGrade}
             </div>
             <h1 className="text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
               BID ON
@@ -71,15 +115,17 @@ export default function Home() {
               <span className="text-[#FEDB02]">LEGENDARY.</span>
             </h1>
             <div className="mt-8 flex flex-wrap items-end gap-5">
-              <p className="text-5xl font-black md:text-7xl">$8,420</p>
-              <p className="font-mono text-xs tracking-widest text-white/60">TOP BID · 14 BIDS</p>
+              <p className="text-5xl font-black md:text-7xl">{featuredPrice}</p>
+              <p className="font-mono text-xs tracking-widest text-white/60">
+                {featuredLoading ? "LOADING FEATURED LISTING" : `${featuredSource} · TOP LISTING`}
+              </p>
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/collectibles"
+                href={featured ? `/collectibles/lot/${featured.id}` : "/collectibles"}
                 className="border-2 border-[#FEDB02] bg-[#FEDB02] px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-black"
               >
-                Place Bid
+                View Lot
               </Link>
               <Link
                 href="/collectibles"
@@ -97,9 +143,14 @@ export default function Home() {
           </div>
 
           <div className="border-2 border-[#FEDB02] bg-[#1A1A1A] p-4">
-            <div className="aspect-[3/4] w-full border-2 border-black bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500" />
-            <p className="mt-3 text-sm font-bold">1999 Pokemon Charizard 1st Edition</p>
-            <p className="mt-1 font-mono text-xs text-[#FEDB02]">LIVE AUCTION · 00:42:18</p>
+            <div className="aspect-[3/4] w-full border-2 border-black bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500">
+              {featured?.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={featured.imageUrl} alt={featured.title} className="h-full w-full object-cover" />
+              ) : null}
+            </div>
+            <p className="mt-3 line-clamp-2 text-sm font-bold">{featured?.title || "Featured collectible"}</p>
+            <p className="mt-1 font-mono text-xs text-[#FEDB02]">FEATURED LISTING · {featuredSource}</p>
           </div>
         </div>
       </section>

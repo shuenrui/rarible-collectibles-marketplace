@@ -98,6 +98,12 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function buildMarketplaceSearchUrl(term?: string): string {
+  const q = (term || "").trim();
+  if (!q) return `${PHYGITALS_SITE_BASE}/marketplace`;
+  return `${PHYGITALS_SITE_BASE}/marketplace?search=${encodeURIComponent(q)}`;
+}
+
 function mapTokenStandard(raw?: string): NormalizedListingUpsert["tokenStandard"] {
   const v = (raw || "").toLowerCase();
   if (v.includes("1155")) return "erc1155";
@@ -210,7 +216,7 @@ function buildSourceUrl(sale: PhygitalsSale): string {
   if (title) return `${PHYGITALS_SITE_BASE}/card/${slugify(title)}`;
 
   if (sale.universalNFTDataAddress) return `${PHYGITALS_SITE_BASE}/card/${sale.universalNFTDataAddress}`;
-  return `${PHYGITALS_SITE_BASE}/marketplace`;
+  return buildMarketplaceSearchUrl(sale.nft?.name);
 }
 
 async function fetchSalesPage(page: number, pageSize: number): Promise<PhygitalsSalesResponse> {
@@ -425,7 +431,7 @@ export async function ingestPhygitalsActiveListings(options: PhygitalsActiveOpti
         sourcePlatform: "phygitals",
         sourceListingId,
         sourceItemId,
-        sourceUrl: listing.slug ? `${PHYGITALS_SITE_BASE}/card/${listing.slug}` : `${PHYGITALS_SITE_BASE}/marketplace`,
+        sourceUrl: listing.slug ? `${PHYGITALS_SITE_BASE}/card/${listing.slug}` : buildMarketplaceSearchUrl(listing.name),
         title,
         description: undefined,
         imageUrl: listing.image || "https://placehold.co/600x800/png?text=No+Image",

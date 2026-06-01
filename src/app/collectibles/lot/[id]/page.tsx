@@ -12,20 +12,55 @@ type ListingItem = {
   priceUsd: string | null;
   sourcePlatform: string;
   sourceUrl: string;
+  sourceItemId: string | null;
   categoryL1: string;
   syncConfidence: number;
+};
+
+type RecentSaleItem = {
+  id: string;
+  title: string;
+  soldAt: string | null;
+  priceDisplay: string;
+  sourcePlatform: string;
+};
+
+type CourtyardEstimate = {
+  estimatedValueUsd: string | null;
+  dealScore: string | null;
 };
 
 type LotPageProps = {
   params: { id: string };
 };
 
-const fallbackBids = [
-  { user: "CardKing", amount: "$8,420", at: "2m ago" },
-  { user: "MintHunter", amount: "$8,100", at: "9m ago" },
-  { user: "RareVault", amount: "$7,850", at: "14m ago" },
-  { user: "HoloPeak", amount: "$7,420", at: "32m ago" },
-];
+function formatMoney(value: string | null): string {
+  if (!value) return "N/A";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return value;
+  return `$${num.toLocaleString()}`;
+}
+
+function formatDisplayPrice(
+  priceUsd: string | null,
+  priceAmount: string,
+  priceCurrency: string,
+): string {
+  if (priceUsd) return formatMoney(priceUsd);
+  return `${priceAmount} ${priceCurrency}`;
+}
+
+function formatShortDate(iso: string | null): string {
+  if (!iso) return "recent";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "recent";
+  const deltaMs = Date.now() - d.getTime();
+  const deltaDays = Math.floor(deltaMs / (1000 * 60 * 60 * 24));
+  if (deltaDays <= 0) return "today";
+  if (deltaDays === 1) return "1d ago";
+  if (deltaDays < 30) return `${deltaDays}d ago`;
+  return d.toLocaleDateString();
+}
 
 async function getListing(id: string): Promise<ListingItem | null> {
   const exact = await prisma.collectibleListing.findUnique({
@@ -52,21 +87,93 @@ async function getListing(id: string): Promise<ListingItem | null> {
     priceUsd: row.priceUsd ? String(row.priceUsd) : null,
     sourcePlatform: row.sourcePlatform,
     sourceUrl: row.sourceUrl,
+    sourceItemId: row.sourceItemId,
     categoryL1: row.categoryL1,
     syncConfidence: row.syncConfidence,
   };
 }
 
+async function getCourtyardEstimate(listing: ListingItem): Promise<CourtyardEstimate | null> {
+  if (listing.sourcePlatform !== "courtyard" || !listing.sourceItemId) return null;
+
+  try {
+    const res = await fetch(
+      `https://Y8TL3M06QA-dsn.algolia.net/1/indexes/marketplace_prod_recently_listed/${encodeURIComponent(listing.sourceItemId)}`,
+      {
+        headers: {
+          "X-Algolia-Application-Id": "Y8TL3M06QA",
+          "X-Algolia-API-Key": "3b3ed18284ca0baee9a496aea5f093d6",
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!res.ok) return null;
+    const json = (await res.json()) as Record<string, unknown>;
+
+    const estimatedValueUsd =
+      json.estimatedValueUsd != null ? String(json.estimatedValueUsd) : null;
+    const dealScore = json.dealScore != null ? String(json.dealScore) : null;
+
+    return { estimatedValueUsd, dealScore };
+  } catch {
+    return null;
+  }
+}
+
+async function getRecentSales(listing: ListingItem): Promise<RecentSaleItem[]> {
+  const soldRows = await prisma.collectibleListing.findMany({
+    where: {
+      listingStatus: "sold",
+      categoryL1: listing.categoryL1 as never,
+      gradeNormalized: listing.gradeNormalized ? (listing.gradeNormalized as never) : undefined,
+      id: { not: listing.id },
+    },
+    orderBy: [{ soldAt: "desc" }, { lastPriceUpdateAt: "desc" }],
+    take: 3,
+  });
+
+  const rows = soldRows.length
+    ? soldRows
+    : await prisma.collectibleListing.findMany({
+        where: {
+          listingStatus: "active",
+          categoryL1: listing.categoryL1 as never,
+          id: { not: listing.id },
+        },
+        orderBy: [{ priceUsd: "asc" }, { lastPriceUpdateAt: "desc" }],
+        take: 3,
+      });
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
+    priceDisplay: formatDisplayPrice(
+      row.priceUsd ? String(row.priceUsd) : null,
+      String(row.priceAmount),
+      row.priceCurrency,
+    ),
+    sourcePlatform: row.sourcePlatform,
+  }));
+}
+
 export default async function LotPage({ params }: LotPageProps) {
   const listing = await getListing(params.id);
+  const recentSales = listing ? await getRecentSales(listing) : [];
+  const courtyardEstimate = listing ? await getCourtyardEstimate(listing) : null;
 
   const title = listing?.title ?? "Featured Collectible";
   const grade = listing?.gradeValue || listing?.gradeNormalized || "UNKNOWN";
-  const priceDisplay = listing?.priceUsd
-    ? `$${Number(listing.priceUsd).toLocaleString()}`
-    : listing
-      ? `${listing.priceAmount} ${listing.priceCurrency}`
-      : "$0";
+  const priceDisplay = listing
+    ? formatDisplayPrice(listing.priceUsd, listing.priceAmount, listing.priceCurrency)
+    : "$0";
+  const askUsd = listing?.priceUsd ? Number(listing.priceUsd) : Number.NaN;
+  const estUsd = courtyardEstimate?.estimatedValueUsd
+    ? Number(courtyardEstimate.estimatedValueUsd)
+    : Number.NaN;
+  const hasDealChip = Number.isFinite(askUsd) && Number.isFinite(estUsd);
+  const isGoodDeal = hasDealChip ? askUsd < estUsd : false;
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
@@ -126,15 +233,28 @@ export default async function LotPage({ params }: LotPageProps) {
                 <p className="mt-1 text-3xl font-black">{priceDisplay}</p>
               </div>
               <div className="border border-white/20 bg-black/30 p-3">
-                <p className="font-mono text-[10px] text-white/50">BIDS</p>
-                <p className="mt-1 text-3xl font-black">14</p>
+                <p className="font-mono text-[10px] text-white/50">DEAL SCORE</p>
+                <p className="mt-1 text-3xl font-black">{courtyardEstimate?.dealScore ?? "N/A"}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <div className="border border-white/20 bg-black/30 p-3">
+                <p className="font-mono text-[10px] text-white/50">MARKET ESTIMATE</p>
+                <p className="mt-1 text-2xl font-black">{formatMoney(courtyardEstimate?.estimatedValueUsd ?? null)}</p>
+                {hasDealChip ? (
+                  <span
+                    className={`mt-2 inline-flex px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.15em] ${
+                      isGoodDeal ? "bg-emerald-400 text-black" : "bg-red-500 text-white"
+                    }`}
+                  >
+                    {isGoodDeal ? "Good deal" : "Above estimate"}
+                  </span>
+                ) : null}
               </div>
             </div>
 
             <div className="mt-6 space-y-3">
-              <button className="w-full border-2 border-[#FEDB02] bg-[#FEDB02] py-3 font-mono text-xs font-black uppercase tracking-[0.2em] text-black">
-                PLACE BID
-              </button>
               <a
                 href={listing?.sourceUrl ?? "#"}
                 target="_blank"
@@ -147,17 +267,23 @@ export default async function LotPage({ params }: LotPageProps) {
           </div>
 
           <div className="border-2 border-white/20 bg-[#111] p-5">
-            <h2 className="text-lg font-black">Bid History</h2>
+            <h2 className="text-lg font-black">Recent Sales</h2>
             <div className="mt-3 space-y-2">
-              {fallbackBids.map((bid) => (
-                <div key={`${bid.user}-${bid.at}`} className="flex items-center justify-between border-b border-white/10 py-2">
-                  <div>
-                    <p className="text-sm font-bold">{bid.user}</p>
-                    <p className="font-mono text-[10px] text-white/45">{bid.at}</p>
+              {recentSales.length ? (
+                recentSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between border-b border-white/10 py-2">
+                    <div>
+                      <p className="line-clamp-1 text-sm font-bold">{sale.title.slice(0, 25)}</p>
+                      <p className="font-mono text-[10px] text-white/45">
+                        {sale.sourcePlatform} · {formatShortDate(sale.soldAt)}
+                      </p>
+                    </div>
+                    <p className="font-mono text-sm font-bold text-[#FEDB02]">{sale.priceDisplay}</p>
                   </div>
-                  <p className="font-mono text-sm font-bold text-[#FEDB02]">{bid.amount}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-white/70">No comparable sales yet for this category/grade.</p>
+              )}
             </div>
           </div>
 

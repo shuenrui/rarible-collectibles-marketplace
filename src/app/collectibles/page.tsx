@@ -37,7 +37,7 @@ function timeAgo(isoString: string): string {
 }
 
 type Facet = { value: string; count: number };
-type TabId = "buy" | "auctions" | "ending" | "new";
+type TabId = "buy" | "drops" | "auctions" | "ending" | "new";
 
 const PLATFORM_LABELS: Record<string, string> = {
   courtyard: "Courtyard",
@@ -185,12 +185,18 @@ export default function CollectiblesPage() {
         page_size: String(PAGE_SIZE),
       });
       if (searchQuery) params.set("q", searchQuery);
-      if (activeCategory !== "all") params.set("category", activeCategory);
+      // Drops tab: sealed products newest first (category can be further narrowed by IP card)
+      if (activeTab === "drops") {
+        params.set("category", activeCategory !== "all" ? activeCategory : "sealed_products");
+        params.set("sort", "updated_desc");
+      } else {
+        if (activeCategory !== "all") params.set("category", activeCategory);
+        if (activeTab === "new" || sort === "updated_desc") params.set("sort", "updated_desc");
+        else if (activeTab === "ending" || sort === "price_asc") params.set("sort", "price_asc");
+        else if (sort === "price_desc") params.set("sort", "price_desc");
+      }
       if (activeGrade !== "all") params.set("grade", activeGrade);
       if (activePlatform !== "all") params.set("source_platform", activePlatform);
-      if (activeTab === "new" || sort === "updated_desc") params.set("sort", "updated_desc");
-      else if (activeTab === "ending" || sort === "price_asc") params.set("sort", "price_asc");
-      else if (sort === "price_desc") params.set("sort", "price_desc");
       if (minPrice) params.set("min_price_usd", minPrice);
       if (maxPrice) params.set("max_price_usd", maxPrice);
       return params;
@@ -246,9 +252,10 @@ export default function CollectiblesPage() {
 
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "buy", label: "Buy Now" },
-    { id: "auctions", label: "Auctions" },
-    { id: "ending", label: "Ending Soon" },
+    { id: "drops", label: "🔥 Drops" },
     { id: "new", label: "New Listings" },
+    { id: "ending", label: "Ending Soon" },
+    { id: "auctions", label: "Auctions" },
   ];
 
   const hasPriceFilter = minPrice || maxPrice;
@@ -669,6 +676,27 @@ export default function CollectiblesPage() {
             ))}
           </div>
 
+          {/* Drops hero banner */}
+          {activeTab === "drops" && (
+            <div className="mb-5 border-2 border-[#FEDB02]/30 bg-gradient-to-r from-[#1A1200] to-[#0A0A0A] p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-mono text-[10px] font-bold tracking-[0.25em] text-[#FEDB02]">🔥 DROPS</p>
+                  <h2 className="mt-1 text-xl font-black leading-tight text-white">Latest Sealed Products</h2>
+                  <p className="mt-1 font-mono text-[11px] text-white/50">
+                    Booster boxes, packs &amp; sealed sets · newest first · badges show age
+                  </p>
+                </div>
+                {!loading && (
+                  <div className="shrink-0 text-right">
+                    <p className="font-mono text-2xl font-black text-[#FEDB02]">{totalItems.toLocaleString()}</p>
+                    <p className="font-mono text-[9px] text-white/40">SEALED LISTINGS</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Active filter chips */}
           {(activeGrade !== "all" || activePlatform !== "all" || hasPriceFilter) && (
             <div className="mb-4 flex flex-wrap gap-2">
@@ -711,7 +739,10 @@ export default function CollectiblesPage() {
                     </div>
                   </div>
                 ))
-              : items.map((item) => (
+              : items.map((item) => {
+                  const itemTimestamp = item.listedAt ?? item.syncedAt;
+                  const isNew = Date.now() - new Date(itemTimestamp).getTime() < 48 * 60 * 60 * 1000;
+                  return (
                   <article key={item.id} className="overflow-hidden border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] transition hover:-translate-y-0.5 hover:shadow-[0_8px_0_#FEDB02]">
                     <Link href={`/collectibles/lot/${item.id}`}>
                       <div className="relative aspect-[3/4] border-b-2 border-[#0A0A0A] bg-gradient-to-br from-yellow-300 via-yellow-400 to-orange-500">
@@ -727,6 +758,12 @@ export default function CollectiblesPage() {
                         <div className="absolute left-1 top-1 bg-[#0A0A0A] px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#FEDB02]">
                           {item.gradeValue || item.gradeNormalized || "UNKNOWN"}
                         </div>
+                        {/* NEW badge for recently listed items */}
+                        {isNew && (
+                          <div className="absolute bottom-1 left-1 bg-orange-500 px-1.5 py-0.5 font-mono text-[8px] font-black tracking-wider text-white">
+                            NEW
+                          </div>
+                        )}
                         {/* Wishlist heart — top right */}
                         <div className="absolute right-1 top-1 bg-[#0A0A0A]/70">
                           <WishlistButton
@@ -760,7 +797,7 @@ export default function CollectiblesPage() {
                       </a>
                     </div>
                   </article>
-                ))}
+                ); })}
             {!loading && items.length === 0 && (
               <div className="col-span-full border border-white/20 bg-black/30 p-6 text-sm text-white/70">
                 {searchQuery

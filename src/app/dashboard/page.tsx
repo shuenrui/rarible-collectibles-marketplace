@@ -75,6 +75,13 @@ export default function DashboardPage() {
   const [embeddedWallets, setEmbeddedWallets] = useState<StoredWallet[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
 
+  // Wishlist state
+  const [wishlistItems, setWishlistItems] = useState<Array<{
+    id: string;
+    listingId: string;
+    listing: CollectionItem & { sourceUrl: string };
+  }>>([]);
+
   // Sell intent modal state
   const [sellModal, setSellModal] = useState<SellModalItem | null>(null);
   const [sellPrice, setSellPrice] = useState("");
@@ -137,6 +144,15 @@ export default function DashboardPage() {
         setEmbeddedWallets(data.embeddedWallets ?? []);
         setActivities(data.activities ?? []);
         setItems(data.collection ?? []);
+
+        // Fetch wishlist
+        fetch(`/api/user/wishlist?privy_user_id=${encodeURIComponent(user.id)}`)
+          .then((r) => r.json())
+          .then((data: { items?: typeof wishlistItems }) => {
+            if (!active) return;
+            setWishlistItems(data.items ?? []);
+          })
+          .catch(() => undefined);
 
         // Fire-and-forget balance sync — updates DB in background
         fetch("/api/user/sync-balances", {
@@ -421,6 +437,47 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {/* My Wishlist */}
+          {wishlistItems.length > 0 && (
+            <div className="mx-auto mt-6 max-w-[1280px] border-2 border-white/10 bg-[#121212] p-6">
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#FEDB02]">My Wishlist</p>
+                  <h2 className="mt-2 text-2xl font-black">Cards you&apos;ve saved.</h2>
+                </div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{wishlistItems.length} saved</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                {wishlistItems.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/collectibles/lot/${item.listingId}`}
+                    className="overflow-hidden border-2 border-white/10 bg-black/30 transition hover:-translate-y-0.5 hover:border-[#FEDB02]"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.listing.imageUrl} alt={item.listing.title} className="aspect-[3/4] w-full object-cover" />
+                    <div className="p-3">
+                      <p className="line-clamp-2 text-sm font-bold">{item.listing.title}</p>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#FEDB02]">
+                          {item.listing.gradeValue || item.listing.gradeNormalized || "unknown"}
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          {item.listing.sourcePlatform}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-lg font-black">
+                        {item.listing.priceUsd
+                          ? `$${Number(item.listing.priceUsd).toLocaleString()}`
+                          : `${item.listing.priceAmount} ${item.listing.priceCurrency}`}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* My Collection */}
           <div className="mx-auto mt-6 max-w-[1280px] border-2 border-white/10 bg-[#121212] p-6">

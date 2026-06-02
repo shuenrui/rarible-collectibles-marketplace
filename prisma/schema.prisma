@@ -107,6 +107,7 @@ model CollectibleListing {
   sourcePlatform   SourcePlatform
   offerIntents     OfferIntent[]
   sellIntents      SellIntent[]
+  wishlistItems    WishlistItem[]
   sourceListingId  String
   sourceItemId     String?
   sourceUrl        String
@@ -176,8 +177,9 @@ model UserProfile {
 
   wallets      UserWallet[]
   activities   UserActivity[]
-  sellIntents  SellIntent[]
-  offerIntents OfferIntent[]
+  sellIntents   SellIntent[]
+  offerIntents  OfferIntent[]
+  wishlistItems WishlistItem[]
 }
 
 model UserWallet {
@@ -261,4 +263,17 @@ model OfferIntent {
 
   @@index([listingId, status])
   @@index([buyerUserId, createdAt])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  user    UserProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing CollectibleListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId, createdAt])
 }

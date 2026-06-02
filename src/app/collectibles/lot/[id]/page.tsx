@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ConnectButton from "@/components/ConnectButton";
 import MakeOfferForm from "@/components/MakeOfferForm";
+import LotWishlistButton from "@/components/LotWishlistButton";
 
 type ListingItem = {
   id: string;
@@ -255,6 +256,7 @@ export default async function LotPage({ params }: LotPageProps) {
             </div>
 
             <div className="mt-6 space-y-3">
+              <LotWishlistButton listingId={listing?.id ?? params.id} />
               <a
                 href={listing?.sourceUrl ?? "#"}
                 target="_blank"

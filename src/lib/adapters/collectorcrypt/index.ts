@@ -149,8 +149,10 @@ function buildImages(item: CollectorCryptItem): { imageUrl: string; images: List
 }
 
 function buildSourceUrl(item: CollectorCryptItem): string {
-  // Collector Crypt's docs do not publish canonical detail URLs; this path is inferred from marketplace patterns.
-  return `${COLLECTORCRYPT_SITE_BASE}/marketplace/cards/${item.id}`;
+  // CC JS bundle uses /cards/:identifier routing. nftAddress (Solana mint) is the canonical
+  // on-chain identifier; fall back to internal id if nftAddress is absent.
+  const identifier = item.nftAddress || item.id;
+  return `${COLLECTORCRYPT_SITE_BASE}/cards/${identifier}`;
 }
 
 function getSellerAddress(item: CollectorCryptItem, listing?: CollectorCryptListing): string | undefined {

@@ -23,48 +23,42 @@ const fandoms = [
     slug: "pokemon",
     count: "3,201",
     tag: "Mythic Electric",
-    banner: "from-[#FFE55D] via-[#FEC700] to-[#FF7E1D]",
-    accent: "text-black",
+    image: "/banners/pokemon.jpg",
   },
   {
     name: "Marvel",
     slug: "comics",
     count: "612",
     tag: "Multiverse Arc",
-    banner: "from-[#111] via-[#5A0F23] to-[#C62828]",
-    accent: "text-white",
+    image: "/banners/marvel.jpg",
   },
   {
     name: "Baseball",
     slug: "sports_cards",
     count: "2,104",
     tag: "Hall of Flame",
-    banner: "from-[#09132A] via-[#1452FF] to-[#4FC2FF]",
-    accent: "text-white",
+    image: "/banners/baseball.jpg",
   },
   {
     name: "Yu-Gi-Oh",
     slug: "yugioh",
     count: "612",
     tag: "Shadow Duel",
-    banner: "from-[#1A072E] via-[#4B1F91] to-[#FF3B70]",
-    accent: "text-white",
+    image: "/banners/yugioh.jpg",
   },
   {
     name: "NBA",
     slug: "sports_cards",
     count: "847",
     tag: "GOAT Vault",
-    banner: "from-[#0A0A0A] via-[#3A3A3A] to-[#A9A9A9]",
-    accent: "text-white",
+    image: "/banners/nba.jpg",
   },
   {
     name: "One Piece",
     slug: "one_piece",
     count: "389",
     tag: "Grand Line",
-    banner: "from-[#022C22] via-[#00B574] to-[#85FFD7]",
-    accent: "text-white",
+    image: "/banners/onepiece.jpg",
   },
 ];
 
@@ -217,21 +211,25 @@ export default function Home() {
                 href={`/collection/${fandom.slug}`}
                 className="group relative overflow-hidden border-2 border-black bg-black"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${fandom.banner}`} />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(255,255,255,0.3),transparent_40%)]" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={fandom.image}
+                  alt={fandom.name}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
 
-                <div className="relative flex min-h-[180px] flex-col justify-end p-5 transition-transform duration-200 group-hover:scale-[1.02]">
-                  <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.22em] ${fandom.accent} opacity-85`}>
+                <div className="relative flex min-h-[180px] flex-col justify-end p-5">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-white/80">
                     {fandom.tag}
                   </p>
-                  <p className={`mt-1 text-3xl font-black leading-none ${fandom.accent}`}>{fandom.name}</p>
+                  <p className="mt-1 text-3xl font-black leading-none text-white">{fandom.name}</p>
                   <div className="mt-3 flex items-center justify-between">
-                    <p className={`font-mono text-xs uppercase tracking-[0.2em] ${fandom.accent} opacity-80`}>
+                    <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/70">
                       {fandom.count} listings
                     </p>
-                    <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.2em] ${fandom.accent}`}>
-                      Enter
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">
+                      Enter →
                     </p>
                   </div>
                 </div>

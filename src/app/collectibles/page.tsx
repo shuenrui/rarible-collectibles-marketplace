@@ -66,6 +66,9 @@ export default function CollectiblesPage() {
   // Platform filter state
   const [activePlatform, setActivePlatform] = useState<string>("all");
 
+  // Mobile filter panel state
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
   // Wishlist state — Set of wishlisted listing IDs
   const [wishlistedIds, setWishlistedIds] = useState<Set<string>>(new Set());
 
@@ -299,6 +302,115 @@ export default function CollectiblesPage() {
             <span className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]">{totalItems.toLocaleString()} LIVE</span>
           </div>
         </div>
+      </div>
+
+      {/* Mobile filter toggle row */}
+      <div className="border-b border-white/10 bg-[#111] px-4 py-2 lg:hidden">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMobileFiltersOpen((o) => !o)}
+            className="flex items-center gap-2 border border-white/25 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-white"
+          >
+            <span>Filters</span>
+            <span className="text-[#FEDB02]">{mobileFiltersOpen ? "▲" : "▼"}</span>
+            {(activeGrade !== "all" || activePlatform !== "all" || hasPriceFilter) && (
+              <span className="h-2 w-2 rounded-full bg-[#FEDB02]" />
+            )}
+          </button>
+          {(activeGrade !== "all" || activePlatform !== "all" || hasPriceFilter) && (
+            <button
+              onClick={() => { clearGradeFilter(); clearPlatformFilter(); clearPriceFilter(); }}
+              className="font-mono text-[9px] text-[#FEDB02]/70 hover:text-[#FEDB02]"
+            >
+              CLEAR ALL
+            </button>
+          )}
+        </div>
+
+        {mobileFiltersOpen && (
+          <div className="mt-3 space-y-4 pb-2">
+            {/* Mobile price filter */}
+            <div>
+              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Price (USD)</p>
+              <form onSubmit={applyPriceFilter} className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Min"
+                  value={minPriceInput}
+                  onChange={(e) => setMinPriceInput(e.target.value)}
+                  className="w-20 border border-white/20 bg-black/40 px-2 py-1 font-mono text-[11px] text-white placeholder-white/30 focus:border-[#FEDB02] focus:outline-none"
+                />
+                <span className="font-mono text-[10px] text-white/40">—</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Max"
+                  value={maxPriceInput}
+                  onChange={(e) => setMaxPriceInput(e.target.value)}
+                  className="w-20 border border-white/20 bg-black/40 px-2 py-1 font-mono text-[11px] text-white placeholder-white/30 focus:border-[#FEDB02] focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="border border-[#FEDB02] px-2 py-1 font-mono text-[9px] font-bold uppercase text-[#FEDB02]"
+                >
+                  Apply
+                </button>
+                {hasPriceFilter && (
+                  <button type="button" onClick={clearPriceFilter} className="font-mono text-[9px] text-white/50">✕</button>
+                )}
+              </form>
+            </div>
+
+            {/* Mobile grade filter */}
+            {grades.length > 0 && (
+              <div>
+                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Grade</p>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={clearGradeFilter}
+                    className={`border px-2 py-1 font-mono text-[9px] font-bold ${activeGrade === "all" ? "border-[#FEDB02] text-[#FEDB02]" : "border-white/20 text-white/50"}`}
+                  >
+                    All
+                  </button>
+                  {grades.slice(0, 8).map((g) => (
+                    <button
+                      key={g.value}
+                      onClick={() => setActiveGrade(g.value ?? "all")}
+                      className={`border px-2 py-1 font-mono text-[9px] font-bold ${activeGrade === g.value ? "border-[#FEDB02] text-[#FEDB02]" : "border-white/20 text-white/50"}`}
+                    >
+                      {g.value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mobile source filter */}
+            {platforms.length > 1 && (
+              <div>
+                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Source</p>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    onClick={clearPlatformFilter}
+                    className={`border px-2 py-1 font-mono text-[9px] font-bold ${activePlatform === "all" ? "border-[#FEDB02] text-[#FEDB02]" : "border-white/20 text-white/50"}`}
+                  >
+                    All
+                  </button>
+                  {platforms.map((p) => (
+                    <button
+                      key={p.value}
+                      onClick={() => setActivePlatform(p.value)}
+                      className={`border px-2 py-1 font-mono text-[9px] font-bold ${activePlatform === p.value ? "border-[#FEDB02] text-[#FEDB02]" : "border-white/20 text-white/50"}`}
+                    >
+                      {PLATFORM_LABELS[p.value] ?? p.value}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <section className="mx-auto flex w-full max-w-[1480px]">

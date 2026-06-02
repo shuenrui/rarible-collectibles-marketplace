@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import ConnectButton from "@/components/ConnectButton";
 import WishlistButton from "@/components/WishlistButton";
@@ -24,21 +24,33 @@ type ListingItem = {
 type Facet = { value: string; count: number };
 type TabId = "buy" | "auctions" | "ending" | "new";
 
+const PAGE_SIZE = 36;
+
 export default function CollectiblesPage() {
   const { authenticated, user } = usePrivy();
 
   const [items, setItems] = useState<ListingItem[]>([]);
   const [categories, setCategories] = useState<Facet[]>([]);
   const [grades, setGrades] = useState<Facet[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<TabId>("buy");
   const [sort, setSort] = useState<string>("updated_desc");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Search state
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Price filter state
+  const [minPriceInput, setMinPriceInput] = useState("");
+  const [maxPriceInput, setMaxPriceInput] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
   // Wishlist state — Set of wishlisted listing IDs
   const [wishlistedIds, setWishlistedIds] = useState<Set<string>>(new Set());
@@ -76,33 +88,82 @@ export default function CollectiblesPage() {
     setSearchQuery("");
   };
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
+  const applyPriceFilter = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setMinPrice(minPriceInput.trim());
+    setMaxPrice(maxPriceInput.trim());
+  };
+
+  const clearPriceFilter = () => {
+    setMinPriceInput("");
+    setMaxPriceInput("");
+    setMinPrice("");
+    setMaxPrice("");
+  };
+
+  const buildParams = useCallback(
+    (page: number) => {
       const params = new URLSearchParams({
         listing_status: "active",
-        page: "1",
-        page_size: "36",
+        page: String(page),
+        page_size: String(PAGE_SIZE),
       });
       if (searchQuery) params.set("q", searchQuery);
       if (activeCategory !== "all") params.set("category", activeCategory);
       if (activeTab === "new" || sort === "updated_desc") params.set("sort", "updated_desc");
-      if (activeTab === "ending" || sort === "price_asc") params.set("sort", "price_asc");
-      if (sort === "price_desc") params.set("sort", "price_desc");
+      else if (activeTab === "ending" || sort === "price_asc") params.set("sort", "price_asc");
+      else if (sort === "price_desc") params.set("sort", "price_desc");
+      if (minPrice) params.set("min_price_usd", minPrice);
+      if (maxPrice) params.set("max_price_usd", maxPrice);
+      return params;
+    },
+    [searchQuery, activeCategory, activeTab, sort, minPrice, maxPrice],
+  );
+
+  // Initial / filter-changed load (resets to page 1)
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      setCurrentPage(1);
 
       const [listingsRes, facetsRes] = await Promise.all([
-        fetch(`/api/collectibles/listings?${params.toString()}`, { cache: "no-store" }),
+        fetch(`/api/collectibles/listings?${buildParams(1).toString()}`, { cache: "no-store" }),
         fetch("/api/collectibles/facets", { cache: "no-store" }),
       ]);
       const listingsJson = await listingsRes.json();
       const facetsJson = await facetsRes.json();
+
       setItems(listingsJson.items ?? []);
+      setTotalItems(listingsJson.pagination?.total ?? 0);
+      setHasMore(
+        (listingsJson.pagination?.page ?? 1) < (listingsJson.pagination?.total_pages ?? 1),
+      );
       setCategories(facetsJson.categories ?? []);
       setGrades(facetsJson.grades ?? []);
       setLoading(false);
     }
     load().catch(() => setLoading(false));
-  }, [activeCategory, activeTab, sort, searchQuery]);
+  }, [activeCategory, activeTab, sort, searchQuery, minPrice, maxPrice, buildParams]);
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = currentPage + 1;
+    try {
+      const res = await fetch(
+        `/api/collectibles/listings?${buildParams(nextPage).toString()}`,
+        { cache: "no-store" },
+      );
+      const json = await res.json();
+      setItems((prev) => [...prev, ...(json.items ?? [])]);
+      setCurrentPage(nextPage);
+      setHasMore(nextPage < (json.pagination?.total_pages ?? 1));
+    } catch {
+      // ignore
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const topCategories = [
     { id: "all", label: "All" },
@@ -119,6 +180,8 @@ export default function CollectiblesPage() {
     { id: "ending", label: "Ending Soon" },
     { id: "new", label: "New Listings" },
   ];
+
+  const hasPriceFilter = minPrice || maxPrice;
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
@@ -189,7 +252,7 @@ export default function CollectiblesPage() {
           <div className="mx-auto flex max-w-[1480px] items-center justify-between">
             <p className="font-mono text-[11px] text-white/70">
               Search results for <span className="font-bold text-white">&ldquo;{searchQuery}&rdquo;</span>
-              {!loading && <span className="ml-2 text-white/45">— {items.length} found</span>}
+              {!loading && <span className="ml-2 text-white/45">— {totalItems} found</span>}
             </p>
             <button onClick={clearSearch} className="font-mono text-[10px] text-[#FEDB02] hover:underline">
               Clear search
@@ -213,7 +276,7 @@ export default function CollectiblesPage() {
           ))}
           <div className="ml-auto hidden items-center gap-2 md:flex">
             <span className="h-2 w-2 rounded-full bg-[#FEDB02]" />
-            <span className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]">{items.length} LIVE</span>
+            <span className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]">{totalItems.toLocaleString()} LIVE</span>
           </div>
         </div>
       </div>
@@ -223,12 +286,58 @@ export default function CollectiblesPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-black">FILTERS</h2>
             <button
-              onClick={() => { setActiveCategory("all"); clearSearch(); }}
+              onClick={() => { setActiveCategory("all"); clearSearch(); clearPriceFilter(); }}
               className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]"
             >
               CLEAR
             </button>
           </div>
+
+          {/* Price range filter */}
+          <p className="mb-2 mt-0 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Price (USD)</p>
+          <form onSubmit={applyPriceFilter} className="space-y-2">
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min="0"
+                placeholder="Min"
+                value={minPriceInput}
+                onChange={(e) => setMinPriceInput(e.target.value)}
+                className="w-full border border-white/20 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white placeholder-white/30 focus:border-[#FEDB02] focus:outline-none"
+              />
+              <span className="shrink-0 font-mono text-[10px] text-white/40">—</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="Max"
+                value={maxPriceInput}
+                onChange={(e) => setMaxPriceInput(e.target.value)}
+                className="w-full border border-white/20 bg-black/40 px-2 py-1.5 font-mono text-[11px] text-white placeholder-white/30 focus:border-[#FEDB02] focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-1">
+              <button
+                type="submit"
+                className="flex-1 border border-[#FEDB02] bg-transparent py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[#FEDB02]"
+              >
+                Apply
+              </button>
+              {hasPriceFilter && (
+                <button
+                  type="button"
+                  onClick={clearPriceFilter}
+                  className="border border-white/20 px-2 py-1 font-mono text-[10px] text-white/50 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {hasPriceFilter && (
+              <p className="font-mono text-[9px] text-[#FEDB02]">
+                {minPrice ? `$${Number(minPrice).toLocaleString()}` : "$0"} — {maxPrice ? `$${Number(maxPrice).toLocaleString()}` : "∞"}
+              </p>
+            )}
+          </form>
 
           <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Category</p>
           <div className="space-y-2">
@@ -262,7 +371,7 @@ export default function CollectiblesPage() {
                 {searchQuery ? `"${searchQuery}"` : "TRADING CARDS"}
               </h1>
               <p className="mt-1 font-mono text-[11px] text-white/45">
-                {loading ? "Loading..." : `${items.length} listings shown`}
+                {loading ? "Loading..." : `${items.length} of ${totalItems.toLocaleString()} listings shown`}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -358,6 +467,38 @@ export default function CollectiblesPage() {
               </div>
             )}
           </div>
+
+          {/* Load more / pagination */}
+          {!loading && items.length > 0 && (
+            <div className="mt-8 flex flex-col items-center gap-3">
+              {hasMore ? (
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="border-2 border-[#FEDB02] px-8 py-3 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-[#FEDB02] transition hover:bg-[#FEDB02] hover:text-black disabled:opacity-50"
+                >
+                  {loadingMore ? "Loading…" : `Load More  ·  ${items.length} / ${totalItems.toLocaleString()}`}
+                </button>
+              ) : (
+                <p className="font-mono text-[11px] text-white/30">
+                  All {totalItems.toLocaleString()} listings shown
+                </p>
+              )}
+              {loadingMore && (
+                <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="overflow-hidden border-2 border-white/10 bg-black/30">
+                      <div className="aspect-[3/4] animate-pulse bg-gradient-to-br from-neutral-800 to-neutral-700" />
+                      <div className="space-y-2 p-2">
+                        <div className="h-3 w-3/4 animate-pulse bg-neutral-700" />
+                        <div className="h-3 w-1/2 animate-pulse bg-neutral-800" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-8 flex items-center justify-between">
             <p className="font-mono text-[11px] text-white/45">LIVE INGEST · COURTYARD / BEEZIE / PHYGITALS / COLLECTOR CRYPT</p>

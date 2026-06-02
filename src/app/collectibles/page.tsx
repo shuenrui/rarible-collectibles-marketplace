@@ -52,6 +52,9 @@ export default function CollectiblesPage() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
 
+  // Grade filter state
+  const [activeGrade, setActiveGrade] = useState<string>("all");
+
   // Wishlist state — Set of wishlisted listing IDs
   const [wishlistedIds, setWishlistedIds] = useState<Set<string>>(new Set());
 
@@ -101,6 +104,8 @@ export default function CollectiblesPage() {
     setMaxPrice("");
   };
 
+  const clearGradeFilter = () => setActiveGrade("all");
+
   const buildParams = useCallback(
     (page: number) => {
       const params = new URLSearchParams({
@@ -110,6 +115,7 @@ export default function CollectiblesPage() {
       });
       if (searchQuery) params.set("q", searchQuery);
       if (activeCategory !== "all") params.set("category", activeCategory);
+      if (activeGrade !== "all") params.set("grade", activeGrade);
       if (activeTab === "new" || sort === "updated_desc") params.set("sort", "updated_desc");
       else if (activeTab === "ending" || sort === "price_asc") params.set("sort", "price_asc");
       else if (sort === "price_desc") params.set("sort", "price_desc");
@@ -117,7 +123,7 @@ export default function CollectiblesPage() {
       if (maxPrice) params.set("max_price_usd", maxPrice);
       return params;
     },
-    [searchQuery, activeCategory, activeTab, sort, minPrice, maxPrice],
+    [searchQuery, activeCategory, activeGrade, activeTab, sort, minPrice, maxPrice],
   );
 
   // Initial / filter-changed load (resets to page 1)
@@ -286,7 +292,7 @@ export default function CollectiblesPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-black">FILTERS</h2>
             <button
-              onClick={() => { setActiveCategory("all"); clearSearch(); clearPriceFilter(); }}
+              onClick={() => { setActiveCategory("all"); clearSearch(); clearPriceFilter(); clearGradeFilter(); }}
               className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]"
             >
               CLEAR
@@ -355,11 +361,21 @@ export default function CollectiblesPage() {
 
           <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Grade</p>
           <div className="space-y-2">
-            {grades.slice(0, 8).map((grade) => (
-              <div key={grade.value} className="flex items-center justify-between border-b border-white/5 py-1">
-                <span className="text-sm text-white/75">{grade.value}</span>
+            <button
+              onClick={clearGradeFilter}
+              className="flex w-full items-center justify-between border-b border-white/5 py-1 text-left"
+            >
+              <span className={`text-sm ${activeGrade === "all" ? "font-bold text-white" : "text-white/65"}`}>All grades</span>
+            </button>
+            {grades.slice(0, 10).map((grade) => (
+              <button
+                key={grade.value}
+                onClick={() => setActiveGrade(grade.value)}
+                className="flex w-full items-center justify-between border-b border-white/5 py-1 text-left"
+              >
+                <span className={`text-sm ${activeGrade === grade.value ? "font-bold text-white" : "text-white/65"}`}>{grade.value}</span>
                 <span className="font-mono text-[10px] text-white/35">{grade.count}</span>
-              </div>
+              </button>
             ))}
           </div>
         </aside>

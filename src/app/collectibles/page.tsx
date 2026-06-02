@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ConnectButton from "@/components/ConnectButton";
 
 type ListingItem = {
   id: string;
@@ -91,7 +92,10 @@ export default function CollectiblesPage() {
               Search cards, sets, players...
             </Link>
           </div>
-          <div className="font-mono text-[10px] font-bold tracking-[0.2em] text-black">COLLECTORS MODE</div>
+          <div className="flex items-center gap-2">
+            <div className="font-mono text-[10px] font-bold tracking-[0.2em] text-black">COLLECTORS MODE</div>
+            <ConnectButton />
+          </div>
         </div>
       </header>
 

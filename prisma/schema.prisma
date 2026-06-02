@@ -77,6 +77,14 @@ enum TokenStandard {
   other
 }
 
+enum UserActivityType {
+  sign_in
+  wallet_linked
+  wallet_unlinked
+  deposit_address_viewed
+  buy_on_source_clicked
+}
+
 model CollectibleListing {
   id               String          @id @default(uuid())
   sourcePlatform   SourcePlatform
@@ -137,4 +145,56 @@ model CollectibleListing {
   @@unique([sourcePlatform, sourceListingId])
   @@index([categoryL1, gradeNormalized, priceUsd, listingStatus])
   @@index([chainId, contractAddress, tokenId])
+}
+
+model UserProfile {
+  id          String         @id @default(cuid())
+  privyUserId String         @unique
+  googleEmail String?
+  email       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  wallets     UserWallet[]
+  activities  UserActivity[]
+}
+
+model UserWallet {
+  id               String       @id @default(cuid())
+  userId           String
+  address          String
+  chainType        String
+  walletClientType String?
+  connectorType    String?
+  walletType       String?
+  isEmbedded       Boolean      @default(false)
+  isLinked         Boolean      @default(true)
+  nativeBalance    String?
+  usdcBalance      String?
+  lastSyncedAt     DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user             UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities       UserActivity[]
+
+  @@unique([userId, address])
+  @@index([address])
+  @@index([userId, chainType])
+}
+
+model UserActivity {
+  id         String           @id @default(cuid())
+  userId     String
+  walletId   String?
+  type       UserActivityType
+  title      String
+  details    Json?
+  createdAt  DateTime         @default(now())
+
+  user       UserProfile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet     UserWallet?      @relation(fields: [walletId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
 }

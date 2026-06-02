@@ -458,6 +458,37 @@ export default function CollectiblesPage() {
             ))}
           </div>
 
+          {/* Active filter chips */}
+          {(activeGrade !== "all" || activePlatform !== "all" || hasPriceFilter) && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {activeGrade !== "all" && (
+                <button
+                  onClick={clearGradeFilter}
+                  className="flex items-center gap-1 border border-[#FEDB02] px-2 py-1 font-mono text-[10px] font-bold text-[#FEDB02]"
+                >
+                  Grade: {activeGrade} <span className="ml-1 opacity-60">✕</span>
+                </button>
+              )}
+              {activePlatform !== "all" && (
+                <button
+                  onClick={clearPlatformFilter}
+                  className="flex items-center gap-1 border border-[#FEDB02] px-2 py-1 font-mono text-[10px] font-bold text-[#FEDB02]"
+                >
+                  Source: {PLATFORM_LABELS[activePlatform] ?? activePlatform} <span className="ml-1 opacity-60">✕</span>
+                </button>
+              )}
+              {hasPriceFilter && (
+                <button
+                  onClick={clearPriceFilter}
+                  className="flex items-center gap-1 border border-[#FEDB02] px-2 py-1 font-mono text-[10px] font-bold text-[#FEDB02]"
+                >
+                  Price: {minPrice ? `$${Number(minPrice).toLocaleString()}` : "$0"}–{maxPrice ? `$${Number(maxPrice).toLocaleString()}` : "∞"}
+                  <span className="ml-1 opacity-60">✕</span>
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {loading
               ? Array.from({ length: 12 }).map((_, i) => (

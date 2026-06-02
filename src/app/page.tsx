@@ -17,6 +17,18 @@ type FeaturedItem = {
   gradeNormalized: string | null;
 };
 
+type HotItem = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  priceAmount: string;
+  priceCurrency: string;
+  priceUsd: string | null;
+  sourcePlatform: string;
+  gradeValue: string | null;
+  gradeNormalized: string | null;
+};
+
 const fandoms = [
   {
     name: "Pokemon",
@@ -62,18 +74,13 @@ const fandoms = [
   },
 ];
 
-const hotLots = [
-  { title: "Charizard 1st Ed Holo", grade: "PSA 10", price: "$8,420" },
-  { title: "Pikachu Illustrator '98", grade: "PSA 8", price: "$45,200" },
-  { title: "Mantle '52 Topps #311", grade: "PSA 9", price: "$12,200" },
-  { title: "Jordan Fleer Rookie #57", grade: "PSA 10", price: "$22,000" },
-];
-
 export default function Home() {
   const [packOpen, setPackOpen] = useState(false);
   const [sellOpen, setSellOpen] = useState(false);
   const [featured, setFeatured] = useState<FeaturedItem | null>(null);
   const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [hotItems, setHotItems] = useState<HotItem[]>([]);
+  const [hotLoading, setHotLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -96,6 +103,27 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadHot = async () => {
+      try {
+        const res = await fetch("/api/collectibles/hot", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { items: HotItem[] };
+        if (active) setHotItems(data.items || []);
+      } finally {
+        if (active) setHotLoading(false);
+      }
+    };
+
+    loadHot();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const featuredPrice = useMemo(() => {
     if (!featured) return "—";
     if (featured.priceUsd) return `$${Number(featured.priceUsd).toLocaleString()}`;
@@ -104,6 +132,8 @@ export default function Home() {
 
   const featuredGrade = featured?.gradeValue || featured?.gradeNormalized || "UNKNOWN";
   const featuredSource = featured?.sourcePlatform?.toUpperCase() || "LISTING";
+
+  const hotCountLabel = hotLoading ? "LOADING TOP LISTINGS" : `${hotItems.length} TOP LISTINGS`;
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
@@ -243,17 +273,38 @@ export default function Home() {
         <div className="mx-auto w-full max-w-[1280px]">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <h2 className="text-4xl font-black leading-none md:text-6xl">HOT RIGHT NOW</h2>
-            <p className="font-mono text-xs font-bold tracking-[0.2em] text-red-600">982 AUCTIONS LIVE</p>
+            <p className="font-mono text-xs font-bold tracking-[0.2em] text-red-600">{hotCountLabel}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {hotLots.map((lot) => (
-              <Link key={lot.title} href="/collectibles" className="border-2 border-black bg-white p-3">
-                <div className="aspect-[3/4] border-2 border-black bg-gradient-to-br from-yellow-200 via-yellow-400 to-orange-500" />
-                <p className="mt-3 text-sm font-black leading-tight">{lot.title}</p>
-                <p className="mt-1 font-mono text-xs">{lot.grade}</p>
-                <p className="mt-2 text-xl font-black">{lot.price}</p>
-              </Link>
-            ))}
+            {hotLoading
+              ? Array.from({ length: 4 }).map((_, index) => (
+                  <div key={`hot-skeleton-${index}`} className="border-2 border-black bg-white p-3">
+                    <div className="aspect-[3/4] border-2 border-black bg-gradient-to-br from-yellow-200 via-yellow-400 to-orange-500" />
+                    <div className="mt-3 h-4 w-4/5 animate-pulse bg-black/10" />
+                    <div className="mt-2 h-3 w-1/3 animate-pulse bg-black/10" />
+                    <div className="mt-3 h-5 w-1/2 animate-pulse bg-black/10" />
+                  </div>
+                ))
+              : hotItems.map((item) => {
+                  const grade = item.gradeValue || item.gradeNormalized || "—";
+                  const price = item.priceUsd
+                    ? `$${Number(item.priceUsd).toLocaleString()}`
+                    : `${item.priceAmount} ${item.priceCurrency}`;
+
+                  return (
+                    <Link key={item.id} href={`/collectibles/lot/${item.id}`} className="border-2 border-black bg-white p-3">
+                      <div className="aspect-[3/4] border-2 border-black bg-gradient-to-br from-yellow-200 via-yellow-400 to-orange-500">
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                        ) : null}
+                      </div>
+                      <p className="mt-3 line-clamp-2 text-sm font-black leading-tight">{item.title}</p>
+                      <p className="mt-1 font-mono text-xs">{grade}</p>
+                      <p className="mt-2 text-xl font-black">{price}</p>
+                    </Link>
+                  );
+                })}
           </div>
         </div>
       </section>

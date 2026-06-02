@@ -33,6 +33,47 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 36;
 
+// IP category definitions with banner images, labels, and gradient fallbacks
+const IP_CATEGORIES: Record<string, { label: string; banner?: string; gradient: string }> = {
+  all: {
+    label: "All",
+    gradient: "from-yellow-400 via-orange-500 to-red-600",
+  },
+  pokemon: {
+    label: "Pokémon",
+    banner: "/banners/pokemon.jpg",
+    gradient: "from-yellow-300 via-yellow-500 to-orange-500",
+  },
+  sports_cards: {
+    label: "Sports Cards",
+    banner: "/banners/baseball.jpg",
+    gradient: "from-blue-500 via-blue-700 to-slate-800",
+  },
+  one_piece: {
+    label: "One Piece",
+    banner: "/banners/onepiece.jpg",
+    gradient: "from-red-500 via-orange-600 to-yellow-500",
+  },
+  yugioh: {
+    label: "Yu-Gi-Oh!",
+    banner: "/banners/yugioh.jpg",
+    gradient: "from-purple-600 via-purple-800 to-black",
+  },
+  comics: {
+    label: "Comics",
+    banner: "/banners/marvel.jpg",
+    gradient: "from-red-700 via-red-900 to-black",
+  },
+  sealed_products: {
+    label: "Sealed",
+    gradient: "from-green-500 via-emerald-700 to-black",
+  },
+  other: {
+    label: "Other",
+    gradient: "from-neutral-600 via-neutral-800 to-black",
+  },
+};
+
 export default function CollectiblesPage() {
   const { authenticated, user } = usePrivy();
 
@@ -188,15 +229,6 @@ export default function CollectiblesPage() {
     }
   };
 
-  const topCategories = [
-    { id: "all", label: "All" },
-    { id: "pokemon", label: "Pokemon" },
-    { id: "sports_cards", label: "Sports Cards" },
-    { id: "one_piece", label: "One Piece" },
-    { id: "yugioh", label: "Yu-Gi-Oh" },
-    { id: "comics", label: "Comics" },
-  ];
-
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "buy", label: "Buy Now" },
     { id: "auctions", label: "Auctions" },
@@ -284,25 +316,77 @@ export default function CollectiblesPage() {
         </div>
       )}
 
-      <div className="border-b-2 border-white/10 bg-[#111] px-4 md:px-8">
-        <div className="mx-auto flex max-w-[1480px] items-center gap-1 overflow-x-auto">
-          {topCategories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={`whitespace-nowrap border-b-2 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-widest ${
-                activeCategory === cat.id ? "border-[#FEDB02] text-[#FEDB02]" : "border-transparent text-white/45"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-          <div className="ml-auto hidden items-center gap-2 md:flex">
-            <span className="h-2 w-2 rounded-full bg-[#FEDB02]" />
-            <span className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]">{totalItems.toLocaleString()} LIVE</span>
+      {/* Visual IP category cards row */}
+      <div className="border-b-2 border-white/10 bg-[#0D0D0D] px-4 py-3 md:px-8">
+        <div className="mx-auto max-w-[1480px]">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {Object.entries(IP_CATEGORIES).map(([id, meta]) => {
+              const catFacet = categories.find((c) => c.value === id);
+              const count = id === "all" ? totalItems : catFacet?.count ?? 0;
+              const isActive = activeCategory === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveCategory(id)}
+                  className={`group relative flex-shrink-0 overflow-hidden rounded-sm ${
+                    isActive ? "ring-2 ring-[#FEDB02]" : "ring-1 ring-white/10"
+                  }`}
+                  style={{ width: 130, height: 72 }}
+                >
+                  {/* Background */}
+                  {meta.banner ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={meta.banner}
+                      alt={meta.label}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : null}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${meta.gradient} ${meta.banner ? "opacity-60" : "opacity-100"}`} />
+                  {/* Overlay text */}
+                  <div className="absolute inset-0 flex flex-col items-start justify-end bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <p className={`font-black text-[11px] leading-tight ${isActive ? "text-[#FEDB02]" : "text-white"}`}>
+                      {meta.label}
+                    </p>
+                    {count > 0 && (
+                      <p className="font-mono text-[9px] text-white/60">{count.toLocaleString()}</p>
+                    )}
+                  </div>
+                  {isActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#FEDB02]" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
+
+      {/* IP Banner Hero — shown when a specific category is selected */}
+      {activeCategory !== "all" && IP_CATEGORIES[activeCategory]?.banner && (
+        <div className="relative h-40 w-full overflow-hidden md:h-52">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={IP_CATEGORIES[activeCategory].banner}
+            alt={IP_CATEGORIES[activeCategory].label}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+          <div className="absolute inset-0 flex flex-col justify-end px-4 pb-6 md:px-8">
+            <div className="mx-auto w-full max-w-[1480px]">
+              <p className="font-mono text-[10px] font-bold tracking-[0.2em] text-[#FEDB02]">CATEGORY</p>
+              <h2 className="text-4xl font-black leading-tight text-white md:text-5xl">
+                {IP_CATEGORIES[activeCategory].label}
+              </h2>
+              {!loading && (
+                <p className="mt-1 font-mono text-[12px] text-white/60">
+                  {totalItems.toLocaleString()} listings · use filters to narrow down
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile filter toggle row */}
       <div className="border-b border-white/10 bg-[#111] px-4 py-2 lg:hidden">

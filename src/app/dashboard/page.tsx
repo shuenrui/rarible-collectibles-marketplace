@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
 import ConnectButton from "@/components/ConnectButton";
 
 type LinkedWallet = {
@@ -39,7 +39,8 @@ function walletChainLabel(chainType?: string) {
 }
 
 export default function DashboardPage() {
-  const { ready, authenticated, user, login, linkWallet } = usePrivy();
+  const { ready, authenticated, user, linkWallet } = usePrivy();
+  const { initOAuth, loading: oauthLoading } = useLoginWithOAuth();
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [loadingCollection, setLoadingCollection] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
@@ -167,10 +168,11 @@ export default function DashboardPage() {
               external wallets later.
             </p>
             <button
-              onClick={() => login({ loginMethods: ["google"] })}
+              onClick={() => initOAuth({ provider: "google" })}
+              disabled={oauthLoading}
               className="mt-6 border-2 border-[#FEDB02] bg-[#FEDB02] px-5 py-3 text-sm font-black uppercase tracking-[0.16em] text-black"
             >
-              Continue with Google
+              {oauthLoading ? "Connecting..." : "Continue with Google"}
             </button>
           </div>
         </section>

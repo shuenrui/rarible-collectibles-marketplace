@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLogout, usePrivy } from "@privy-io/react-auth";
+import { useLoginWithOAuth, useLogout, usePrivy } from "@privy-io/react-auth";
 
 function truncateAddress(value: string) {
   if (value.length <= 12) return value;
@@ -9,7 +9,8 @@ function truncateAddress(value: string) {
 }
 
 export default function ConnectButton() {
-  const { ready, authenticated, user, login } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
+  const { initOAuth, loading } = useLoginWithOAuth();
   const { logout } = useLogout();
 
   const accountLabel =
@@ -34,10 +35,11 @@ export default function ConnectButton() {
   if (!authenticated) {
     return (
       <button
-        onClick={() => login({ loginMethods: ["google"] })}
+        onClick={() => initOAuth({ provider: "google" })}
+        disabled={loading}
         className="border-2 border-black bg-black px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[#FEDB02]"
       >
-        Connect account
+        {loading ? "Connecting..." : "Connect account"}
       </button>
     );
   }

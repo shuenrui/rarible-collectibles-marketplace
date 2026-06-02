@@ -83,11 +83,30 @@ enum UserActivityType {
   wallet_unlinked
   deposit_address_viewed
   buy_on_source_clicked
+  sell_intent_created
+  offer_intent_created
+}
+
+enum SellIntentStatus {
+  pending
+  active
+  sold
+  cancelled
+}
+
+enum OfferIntentStatus {
+  pending
+  accepted
+  rejected
+  expired
+  cancelled
 }
 
 model CollectibleListing {
   id               String          @id @default(uuid())
   sourcePlatform   SourcePlatform
+  offerIntents     OfferIntent[]
+  sellIntents      SellIntent[]
   sourceListingId  String
   sourceItemId     String?
   sourceUrl        String
@@ -155,8 +174,10 @@ model UserProfile {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  wallets     UserWallet[]
-  activities  UserActivity[]
+  wallets      UserWallet[]
+  activities   UserActivity[]
+  sellIntents  SellIntent[]
+  offerIntents OfferIntent[]
 }
 
 model UserWallet {
@@ -177,6 +198,7 @@ model UserWallet {
 
   user             UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
   activities       UserActivity[]
+  sellIntents      SellIntent[]
 
   @@unique([userId, address])
   @@index([address])
@@ -197,4 +219,46 @@ model UserActivity {
 
   @@index([userId, createdAt])
   @@index([walletId, createdAt])
+}
+
+model SellIntent {
+  id            String           @id @default(cuid())
+  userId        String
+  walletId      String?
+  listingId     String?
+  title         String
+  imageUrl      String?
+  priceAmount   String
+  priceCurrency String           @default("USDC")
+  status        SellIntentStatus @default(pending)
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  user          UserProfile           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet        UserWallet?           @relation(fields: [walletId], references: [id])
+  listing       CollectibleListing?   @relation(fields: [listingId], references: [id])
+
+  @@index([userId, status])
+  @@index([listingId])
+}
+
+model OfferIntent {
+  id            String            @id @default(cuid())
+  listingId     String
+  buyerUserId   String?
+  buyerAddress  String
+  offerAmount   String
+  offerCurrency String            @default("USDC")
+  expiresAt     DateTime?
+  status        OfferIntentStatus @default(pending)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  listing       CollectibleListing @relation(fields: [listingId], references: [id])
+  buyer         UserProfile?       @relation(fields: [buyerUserId], references: [id], onDelete: SetNull)
+
+  @@index([listingId, status])
+  @@index([buyerUserId, createdAt])
 }

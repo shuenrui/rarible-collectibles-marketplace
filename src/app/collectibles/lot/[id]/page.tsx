@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import ConnectButton from "@/components/ConnectButton";
+import MakeOfferForm from "@/components/MakeOfferForm";
 
 type ListingItem = {
   id: string;
@@ -182,13 +184,11 @@ export default async function LotPage({ params }: LotPageProps) {
           <Link href="/" className="font-black tracking-tight text-black md:text-lg">
             RARIBLE COLLECTIBLES
           </Link>
-          <nav className="hidden items-center gap-2 md:flex">
-            <Link href="/collectibles" className="px-3 py-2 text-sm font-bold text-black">
+          <nav className="flex items-center gap-2">
+            <Link href="/collectibles" className="hidden px-3 py-2 text-sm font-bold text-black md:block">
               Marketplace
             </Link>
-            <Link href="/vault" className="px-3 py-2 text-sm font-bold text-black/70">
-              Vault
-            </Link>
+            <ConnectButton />
           </nav>
         </div>
       </header>
@@ -296,6 +296,8 @@ export default async function LotPage({ params }: LotPageProps) {
               <li>• On-chain / API settlement: recorded</li>
             </ul>
           </div>
+
+          <MakeOfferForm listingId={listing?.id ?? params.id} />
 
           <Link
             href="/collectibles"

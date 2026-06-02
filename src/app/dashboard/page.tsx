@@ -43,6 +43,8 @@ type ActivityItem = {
   createdAt: string;
 };
 
+type SellModalItem = CollectionItem & { selectedWalletId?: string };
+
 function truncateAddress(value: string) {
   if (value.length <= 12) return value;
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
@@ -57,12 +59,9 @@ function walletChainLabel(chainType?: string) {
 function timeAgo(value: string) {
   const diffMs = Date.now() - new Date(value).getTime();
   const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
-
   if (diffMinutes < 60) return `${diffMinutes}m ago`;
-
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
-
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays}d ago`;
 }
@@ -76,9 +75,16 @@ export default function DashboardPage() {
   const [embeddedWallets, setEmbeddedWallets] = useState<StoredWallet[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
 
+  // Sell intent modal state
+  const [sellModal, setSellModal] = useState<SellModalItem | null>(null);
+  const [sellPrice, setSellPrice] = useState("");
+  const [sellWalletId, setSellWalletId] = useState("");
+  const [sellNotes, setSellNotes] = useState("");
+  const [sellState, setSellState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [sellError, setSellError] = useState("");
+
   const wallets = useMemo(() => {
     const linkedAccounts = (user?.linkedAccounts ?? []) as LinkedWallet[];
-
     return linkedAccounts.filter(
       (account) =>
         (account.type === "wallet" || account.type === "smart_wallet") &&
@@ -103,9 +109,7 @@ export default function DashboardPage() {
       try {
         await fetch("/api/user/sync", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             privyUserId: user.id,
             googleEmail: user.google?.email ?? null,
@@ -114,9 +118,7 @@ export default function DashboardPage() {
           }),
         });
 
-        const params = new URLSearchParams({
-          privy_user_id: user.id,
-        });
+        const params = new URLSearchParams({ privy_user_id: user.id });
         const response = await fetch(`/api/user/dashboard?${params.toString()}`, {
           cache: "no-store",
         });
@@ -135,6 +137,24 @@ export default function DashboardPage() {
         setEmbeddedWallets(data.embeddedWallets ?? []);
         setActivities(data.activities ?? []);
         setItems(data.collection ?? []);
+
+        // Fire-and-forget balance sync — updates DB in background
+        fetch("/api/user/sync-balances", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ privyUserId: user.id }),
+        })
+          .then(() =>
+            fetch(`/api/user/dashboard?${params.toString()}`, { cache: "no-store" }),
+          )
+          .then((r) => r.json())
+          .then((fresh) => {
+            if (!active) return;
+            const f = fresh as { wallets?: StoredWallet[]; embeddedWallets?: StoredWallet[] };
+            if (f.wallets) setStoredWallets(f.wallets);
+            if (f.embeddedWallets) setEmbeddedWallets(f.embeddedWallets);
+          })
+          .catch(() => undefined);
       } finally {
         if (active) setLoadingCollection(false);
       }
@@ -153,6 +173,59 @@ export default function DashboardPage() {
     await navigator.clipboard.writeText(address);
     setCopiedAddress(address);
     window.setTimeout(() => setCopiedAddress(null), 1500);
+  };
+
+  const openSellModal = (item: CollectionItem) => {
+    setSellModal(item);
+    setSellPrice("");
+    setSellWalletId(storedWallets[0]?.id ?? "");
+    setSellNotes("");
+    setSellState("idle");
+    setSellError("");
+  };
+
+  const closeSellModal = () => {
+    setSellModal(null);
+    setSellState("idle");
+  };
+
+  const handleSellSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sellModal || !user?.id) return;
+    if (!sellPrice || Number.isNaN(Number(sellPrice))) {
+      setSellError("Enter a valid asking price.");
+      return;
+    }
+
+    setSellState("submitting");
+    setSellError("");
+
+    try {
+      const res = await fetch("/api/user/sell-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          privyUserId: user.id,
+          walletId: sellWalletId || null,
+          listingId: sellModal.id,
+          title: sellModal.title,
+          imageUrl: sellModal.imageUrl,
+          priceAmount: sellPrice,
+          priceCurrency: "USDC",
+          notes: sellNotes.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error ?? "Failed to create listing");
+      }
+
+      setSellState("success");
+    } catch (err) {
+      setSellError(err instanceof Error ? err.message : "Something went wrong");
+      setSellState("error");
+    }
   };
 
   return (
@@ -218,6 +291,7 @@ export default function DashboardPage() {
       ) : (
         <section className="px-4 py-12 md:px-8">
           <div className="mx-auto grid w-full max-w-[1280px] gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            {/* Linked wallets */}
             <div className="border-2 border-white/10 bg-[#121212] p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -235,7 +309,7 @@ export default function DashboardPage() {
                   storedWallets.map((wallet) => (
                     <div key={wallet.id} className="border border-white/10 bg-black/30 p-4">
                       <div className="flex items-start justify-between gap-4">
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#FEDB02]">
                             {walletChainLabel(wallet.chainType)}
                           </p>
@@ -243,9 +317,16 @@ export default function DashboardPage() {
                           <p className="mt-1 text-xs text-white/45">
                             {wallet.walletClientType || wallet.connectorType || "linked wallet"}
                           </p>
-                          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
-                            {wallet.nativeBalance ? `Native ${wallet.nativeBalance}` : "Balance sync pending"}
-                          </p>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                            {wallet.nativeBalance ? (
+                              <span className="font-mono text-[10px] text-white/50">{wallet.nativeBalance}</span>
+                            ) : null}
+                            {wallet.usdcBalance ? (
+                              <span className="font-mono text-[10px] text-[#FEDB02]/70">{wallet.usdcBalance}</span>
+                            ) : (
+                              <span className="font-mono text-[10px] text-white/25">Balance syncing…</span>
+                            )}
+                          </div>
                         </div>
                         <button
                           onClick={() => copyAddress(wallet.address)}
@@ -277,6 +358,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Deposit addresses */}
             <div className="border-2 border-white/10 bg-[#121212] p-6">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#FEDB02]">Deposit USDC</p>
               <h2 className="mt-2 text-2xl font-black">Use your Privy wallet addresses.</h2>
@@ -293,6 +375,9 @@ export default function DashboardPage() {
                         {walletChainLabel(wallet.chainType)} deposit address
                       </p>
                       <p className="mt-2 break-all text-sm font-semibold">{wallet.address}</p>
+                      {wallet.usdcBalance && (
+                        <p className="mt-1 font-mono text-[10px] text-[#FEDB02]/70">{wallet.usdcBalance}</p>
+                      )}
                       <button
                         onClick={() => copyAddress(wallet.address)}
                         className="mt-3 border border-white/15 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/75"
@@ -310,6 +395,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Activity */}
           <div className="mx-auto mt-6 max-w-[1280px] border-2 border-white/10 bg-[#121212] p-6">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-6">
               <div>
@@ -325,7 +411,7 @@ export default function DashboardPage() {
               {activities.length ? (
                 activities.slice(0, 6).map((activity) => (
                   <div key={activity.id} className="border border-white/10 bg-black/30 p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#FEDB02]">{activity.type}</p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#FEDB02]">{activity.type.replace(/_/g, " ")}</p>
                     <p className="mt-2 text-sm font-bold">{activity.title}</p>
                     <p className="mt-2 text-xs text-white/45">{timeAgo(activity.createdAt)}</p>
                   </div>
@@ -336,6 +422,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* My Collection */}
           <div className="mx-auto mt-6 max-w-[1280px] border-2 border-white/10 bg-[#121212] p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -383,15 +470,21 @@ export default function DashboardPage() {
                           </p>
                         </div>
                       </Link>
-                      <div className="px-3 pb-3">
+                      <div className="flex gap-2 px-3 pb-3">
                         <a
                           href={item.sourceUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex border border-[#FEDB02] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#FEDB02]"
+                          className="flex-1 border border-[#FEDB02] px-3 py-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-[#FEDB02]"
                         >
                           Buy on source
                         </a>
+                        <button
+                          onClick={() => openSellModal(item)}
+                          className="border border-white/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70 hover:border-white/50"
+                        >
+                          Sell
+                        </button>
                       </div>
                     </article>
                   ))}
@@ -406,6 +499,108 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
+
+      {/* Sell Intent Modal */}
+      {sellModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeSellModal(); }}
+        >
+          <div className="w-full max-w-md border-2 border-[#FEDB02] bg-[#0A0A0A] p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#FEDB02]">List for sale</p>
+                <h2 className="mt-2 text-xl font-black">{sellModal.title}</h2>
+              </div>
+              <button onClick={closeSellModal} className="text-white/50 hover:text-white text-xl font-bold">✕</button>
+            </div>
+
+            {sellState === "success" ? (
+              <div className="mt-6">
+                <p className="text-sm text-white/70">
+                  Your sell intent has been recorded for <strong>{sellModal.title}</strong> at{" "}
+                  <strong>{sellPrice} USDC</strong>. Our team will review and reach out.
+                </p>
+                <button
+                  onClick={closeSellModal}
+                  className="mt-4 border-2 border-[#FEDB02] px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#FEDB02]"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSellSubmit} className="mt-6 space-y-4">
+                <div>
+                  <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-white/50">
+                    Asking price (USDC)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={sellPrice}
+                    onChange={(e) => setSellPrice(e.target.value)}
+                    placeholder="e.g. 500.00"
+                    required
+                    className="mt-1 w-full border border-white/20 bg-black/40 px-3 py-2 text-sm font-bold text-white placeholder-white/30 focus:border-[#FEDB02] focus:outline-none"
+                  />
+                </div>
+
+                {storedWallets.length > 1 && (
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-white/50">
+                      Selling wallet
+                    </label>
+                    <select
+                      value={sellWalletId}
+                      onChange={(e) => setSellWalletId(e.target.value)}
+                      className="mt-1 w-full border border-white/20 bg-black px-3 py-2 text-sm text-white focus:border-[#FEDB02] focus:outline-none"
+                    >
+                      {storedWallets.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {walletChainLabel(w.chainType)} · {truncateAddress(w.address)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-white/50">
+                    Notes (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={sellNotes}
+                    onChange={(e) => setSellNotes(e.target.value)}
+                    placeholder="Condition notes, preferred buyer, etc."
+                    className="mt-1 w-full border border-white/20 bg-black/40 px-3 py-2 text-sm text-white placeholder-white/30 focus:border-[#FEDB02] focus:outline-none"
+                  />
+                </div>
+
+                {sellError && <p className="text-xs text-red-400">{sellError}</p>}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={sellState === "submitting"}
+                    className="flex-1 border-2 border-[#FEDB02] bg-[#FEDB02] py-3 font-mono text-xs font-black uppercase tracking-[0.2em] text-black disabled:opacity-60"
+                  >
+                    {sellState === "submitting" ? "Submitting…" : "List for sale"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeSellModal}
+                    className="border-2 border-white/20 px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.16em] text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

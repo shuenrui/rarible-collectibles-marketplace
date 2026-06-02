@@ -21,6 +21,7 @@ COPY . .
 ENV DATABASE_URL="postgresql://build:build@localhost/build"
 ENV DIRECT_URL="postgresql://build:build@localhost/build"
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_PRIVY_APP_ID="cmpw34ogf001b0cjrfo5u2qxc"
 
 RUN pnpm prisma generate && pnpm next build
 

@@ -19,7 +19,22 @@ type ListingItem = {
   sourceUrl: string;
   categoryL1: string;
   syncConfidence: number;
+  syncedAt: string;
+  listedAt: string | null;
 };
+
+function timeAgo(isoString: string): string {
+  const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
 
 type Facet = { value: string; count: number };
 type TabId = "buy" | "auctions" | "ending" | "new";
@@ -727,7 +742,10 @@ export default function CollectiblesPage() {
                           <p className="text-base font-black">
                             {item.priceUsd ? `$${Number(item.priceUsd).toLocaleString()}` : `${item.priceAmount} ${item.priceCurrency}`}
                           </p>
-                          <span className="font-mono text-[9px] text-[#6B6B6B]">{item.sourcePlatform}</span>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="font-mono text-[9px] text-[#6B6B6B]">{item.sourcePlatform}</span>
+                            <span className="font-mono text-[8px] text-white/30">{timeAgo(item.listedAt ?? item.syncedAt)}</span>
+                          </div>
                         </div>
                       </div>
                     </Link>

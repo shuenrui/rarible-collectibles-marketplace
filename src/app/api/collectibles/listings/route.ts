@@ -75,6 +75,8 @@ export async function GET(req: NextRequest) {
         syncConfidence: true,
         vaulted: true,
         redeemable: true,
+        syncedAt: true,
+        listedAt: true,
       },
     }),
     prisma.collectibleListing.count({ where }),
@@ -85,6 +87,8 @@ export async function GET(req: NextRequest) {
       ...item,
       priceAmount: item.priceAmount.toString(),
       priceUsd: item.priceUsd?.toString() ?? null,
+      syncedAt: item.syncedAt.toISOString(),
+      listedAt: item.listedAt?.toISOString() ?? null,
     })),
     pagination: {
       page,

@@ -24,6 +24,13 @@ type ListingItem = {
 type Facet = { value: string; count: number };
 type TabId = "buy" | "auctions" | "ending" | "new";
 
+const PLATFORM_LABELS: Record<string, string> = {
+  courtyard: "Courtyard",
+  beezie: "Beezie",
+  collector_crypt: "Collector Crypt",
+  phygitals: "Phygitals",
+};
+
 const PAGE_SIZE = 36;
 
 export default function CollectiblesPage() {
@@ -32,6 +39,7 @@ export default function CollectiblesPage() {
   const [items, setItems] = useState<ListingItem[]>([]);
   const [categories, setCategories] = useState<Facet[]>([]);
   const [grades, setGrades] = useState<Facet[]>([]);
+  const [platforms, setPlatforms] = useState<Facet[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -54,6 +62,9 @@ export default function CollectiblesPage() {
 
   // Grade filter state
   const [activeGrade, setActiveGrade] = useState<string>("all");
+
+  // Platform filter state
+  const [activePlatform, setActivePlatform] = useState<string>("all");
 
   // Wishlist state — Set of wishlisted listing IDs
   const [wishlistedIds, setWishlistedIds] = useState<Set<string>>(new Set());
@@ -105,6 +116,7 @@ export default function CollectiblesPage() {
   };
 
   const clearGradeFilter = () => setActiveGrade("all");
+  const clearPlatformFilter = () => setActivePlatform("all");
 
   const buildParams = useCallback(
     (page: number) => {
@@ -116,6 +128,7 @@ export default function CollectiblesPage() {
       if (searchQuery) params.set("q", searchQuery);
       if (activeCategory !== "all") params.set("category", activeCategory);
       if (activeGrade !== "all") params.set("grade", activeGrade);
+      if (activePlatform !== "all") params.set("source_platform", activePlatform);
       if (activeTab === "new" || sort === "updated_desc") params.set("sort", "updated_desc");
       else if (activeTab === "ending" || sort === "price_asc") params.set("sort", "price_asc");
       else if (sort === "price_desc") params.set("sort", "price_desc");
@@ -123,7 +136,7 @@ export default function CollectiblesPage() {
       if (maxPrice) params.set("max_price_usd", maxPrice);
       return params;
     },
-    [searchQuery, activeCategory, activeGrade, activeTab, sort, minPrice, maxPrice],
+    [searchQuery, activeCategory, activeGrade, activePlatform, activeTab, sort, minPrice, maxPrice],
   );
 
   // Initial / filter-changed load (resets to page 1)
@@ -146,6 +159,7 @@ export default function CollectiblesPage() {
       );
       setCategories(facetsJson.categories ?? []);
       setGrades(facetsJson.grades ?? []);
+      setPlatforms(facetsJson.platforms ?? []);
       setLoading(false);
     }
     load().catch(() => setLoading(false));
@@ -292,7 +306,7 @@ export default function CollectiblesPage() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-black">FILTERS</h2>
             <button
-              onClick={() => { setActiveCategory("all"); clearSearch(); clearPriceFilter(); clearGradeFilter(); }}
+              onClick={() => { setActiveCategory("all"); clearSearch(); clearPriceFilter(); clearGradeFilter(); clearPlatformFilter(); }}
               className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]"
             >
               CLEAR
@@ -358,6 +372,33 @@ export default function CollectiblesPage() {
               </button>
             ))}
           </div>
+
+          {/* Platform filter */}
+          {platforms.length > 1 && (
+            <>
+              <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Source</p>
+              <div className="space-y-2">
+                <button
+                  onClick={clearPlatformFilter}
+                  className="flex w-full items-center justify-between border-b border-white/5 py-1 text-left"
+                >
+                  <span className={`text-sm ${activePlatform === "all" ? "font-bold text-white" : "text-white/65"}`}>All sources</span>
+                </button>
+                {platforms.map((p) => (
+                  <button
+                    key={p.value}
+                    onClick={() => setActivePlatform(p.value)}
+                    className="flex w-full items-center justify-between border-b border-white/5 py-1 text-left"
+                  >
+                    <span className={`text-sm ${activePlatform === p.value ? "font-bold text-white" : "text-white/65"}`}>
+                      {PLATFORM_LABELS[p.value] ?? p.value}
+                    </span>
+                    <span className="font-mono text-[10px] text-white/35">{p.count}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Grade</p>
           <div className="space-y-2">

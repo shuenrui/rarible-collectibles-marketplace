@@ -9,48 +9,66 @@ function asCsv(value: string | null): string[] {
   return value.split(",").map((v) => v.trim()).filter(Boolean);
 }
 
-function softDiversifyBySource<T extends { sourcePlatform: string }>(
-  items: T[],
+function getTimestampScore(item: { listedAt: Date | null; syncedAt: Date }) {
+  return item.listedAt?.getTime() ?? item.syncedAt.getTime();
+}
+
+function softDiversifyBySource<T extends { sourcePlatform: string; listedAt: Date | null; syncedAt: Date }>(
+  itemsBySource: T[][],
   pageSize: number,
   page: number,
 ) {
   const target = page * pageSize;
-  const blocks: T[] = [];
-  const maxPerSource = Math.ceil(pageSize / 2);
-  const queue = [...items];
-  const deferred: T[] = [];
+  const maxConsecutivePerSource = Math.max(2, Math.ceil(pageSize / 5));
+  const cursors = new Array(itemsBySource.length).fill(0);
+  const merged: T[] = [];
+  let lastSource: string | null = null;
+  let currentRun = 0;
 
-  while (blocks.length < target && (queue.length || deferred.length)) {
-    const perPageCounts = new Map<string, number>();
-    const pageItems: T[] = [];
-    const spillover: T[] = [];
+  while (merged.length < target) {
+    let bestBucketIndex = -1;
+    let bestBucketItem: T | null = null;
 
-    while (pageItems.length < pageSize && queue.length) {
-      const candidate = queue.shift() as T;
-      const currentCount = perPageCounts.get(candidate.sourcePlatform) ?? 0;
+    for (let index = 0; index < itemsBySource.length; index += 1) {
+      const candidate = itemsBySource[index][cursors[index]];
+      if (!candidate) continue;
 
-      if (currentCount < maxPerSource) {
-        pageItems.push(candidate);
-        perPageCounts.set(candidate.sourcePlatform, currentCount + 1);
-      } else {
-        spillover.push(candidate);
+      const isRunBlocked =
+        candidate.sourcePlatform === lastSource && currentRun >= maxConsecutivePerSource;
+      if (isRunBlocked) continue;
+
+      if (!bestBucketItem || getTimestampScore(candidate) > getTimestampScore(bestBucketItem)) {
+        bestBucketItem = candidate;
+        bestBucketIndex = index;
       }
     }
 
-    while (pageItems.length < pageSize && deferred.length) {
-      pageItems.push(deferred.shift() as T);
+    if (!bestBucketItem) {
+      for (let index = 0; index < itemsBySource.length; index += 1) {
+        const candidate = itemsBySource[index][cursors[index]];
+        if (!candidate) continue;
+        if (!bestBucketItem || getTimestampScore(candidate) > getTimestampScore(bestBucketItem)) {
+          bestBucketItem = candidate;
+          bestBucketIndex = index;
+        }
+      }
     }
 
-    while (pageItems.length < pageSize && spillover.length) {
-      pageItems.push(spillover.shift() as T);
-    }
+    if (!bestBucketItem || bestBucketIndex === -1) break;
 
-    deferred.push(...spillover);
-    blocks.push(...pageItems);
+    merged.push(bestBucketItem);
+    cursors[bestBucketIndex] += 1;
+
+    if (bestBucketItem.sourcePlatform === lastSource) {
+      currentRun += 1;
+    } else {
+      lastSource = bestBucketItem.sourcePlatform;
+      currentRun = 1;
+    }
   }
 
   const start = (page - 1) * pageSize;
-  return blocks.slice(start, start + pageSize);
+  return merged.slice(start, start + pageSize);
 }
 
 export async function GET(req: NextRequest) {
@@ -131,15 +149,33 @@ export async function GET(req: NextRequest) {
 
   const items = shouldDiversifyAll
     ? await (async () => {
-        const candidateTake = Math.max(page * pageSize * 6, 96);
-        const candidates = await prisma.collectibleListing.findMany({
+        const sourceRows = await prisma.collectibleListing.groupBy({
+          by: ["sourcePlatform"],
           where,
-          orderBy,
-          take: candidateTake,
-          select,
+          _count: { _all: true },
+          orderBy: {
+            _count: {
+              sourcePlatform: "desc",
+            },
+          },
         });
 
-        return softDiversifyBySource(candidates, pageSize, page);
+        const candidateTakePerSource = Math.max(page * pageSize * 2, 24);
+        const sourceBuckets = await Promise.all(
+          sourceRows.map((row) =>
+            prisma.collectibleListing.findMany({
+              where: {
+                ...where,
+                sourcePlatform: row.sourcePlatform,
+              },
+              orderBy,
+              take: candidateTakePerSource,
+              select,
+            }),
+          ),
+        );
+
+        return softDiversifyBySource(sourceBuckets, pageSize, page);
       })()
     : await prisma.collectibleListing.findMany({
         where,

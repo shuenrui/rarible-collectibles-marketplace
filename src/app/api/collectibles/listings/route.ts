@@ -9,6 +9,24 @@ function asCsv(value: string | null): string[] {
   return value.split(",").map((v) => v.trim()).filter(Boolean);
 }
 
+function interleaveBySource<T extends { sourcePlatform: string }>(itemsBySource: T[][]) {
+  const merged: T[] = [];
+  let appended = true;
+
+  for (let index = 0; appended; index += 1) {
+    appended = false;
+
+    for (const bucket of itemsBySource) {
+      const item = bucket[index];
+      if (!item) continue;
+      merged.push(item);
+      appended = true;
+    }
+  }
+
+  return merged;
+}
+
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const page = Number(sp.get("page") || "1");
@@ -46,41 +64,89 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  const orderBy: Prisma.CollectibleListingOrderByWithRelationInput =
+  const orderBy: Prisma.CollectibleListingOrderByWithRelationInput[] =
     sort === "price_asc"
-      ? { priceUsd: "asc" }
+      ? [{ priceUsd: "asc" }, { listedAt: "desc" }, { syncedAt: "desc" }]
       : sort === "price_desc"
-      ? { priceUsd: "desc" }
-      : { syncedAt: "desc" };
+      ? [{ priceUsd: "desc" }, { listedAt: "desc" }, { syncedAt: "desc" }]
+      : [{ listedAt: "desc" }, { syncedAt: "desc" }];
 
-  const [items, total] = await Promise.all([
-    prisma.collectibleListing.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        title: true,
-        imageUrl: true,
-        gradeValue: true,
-        gradeNormalized: true,
-        priceAmount: true,
-        priceCurrency: true,
-        priceUsd: true,
-        sourcePlatform: true,
-        sourceUrl: true,
-        listingStatus: true,
-        categoryL1: true,
-        syncConfidence: true,
-        vaulted: true,
-        redeemable: true,
-        syncedAt: true,
-        listedAt: true,
-      },
-    }),
-    prisma.collectibleListing.count({ where }),
-  ]);
+  const shouldDiversifyAll =
+    !q &&
+    !categories.length &&
+    !grades.length &&
+    !platforms.length &&
+    !minPrice &&
+    !maxPrice &&
+    status === "active" &&
+    sort === "updated_desc";
+
+  const select = {
+    id: true,
+    title: true,
+    imageUrl: true,
+    gradeValue: true,
+    gradeNormalized: true,
+    priceAmount: true,
+    priceCurrency: true,
+    priceUsd: true,
+    sourcePlatform: true,
+    sourceUrl: true,
+    listingStatus: true,
+    categoryL1: true,
+    syncConfidence: true,
+    vaulted: true,
+    redeemable: true,
+    syncedAt: true,
+    listedAt: true,
+  } satisfies Prisma.CollectibleListingSelect;
+
+  const total = await prisma.collectibleListing.count({ where });
+
+  const items = shouldDiversifyAll
+    ? await (async () => {
+        const sourceRows = await prisma.collectibleListing.groupBy({
+          by: ["sourcePlatform"],
+          where,
+          _count: {
+            _all: true,
+          },
+          orderBy: {
+            _count: {
+              sourcePlatform: "desc",
+            },
+          },
+        });
+
+        const sourcePlatforms = sourceRows.map((row) => row.sourcePlatform);
+        const sourceCount = Math.max(sourcePlatforms.length, 1);
+        const perSourceTake = Math.max(Math.ceil((page * pageSize) / sourceCount) + 6, 12);
+
+        const sourceBuckets = await Promise.all(
+          sourcePlatforms.map((sourcePlatform) =>
+            prisma.collectibleListing.findMany({
+              where: {
+                ...where,
+                sourcePlatform,
+              },
+              orderBy,
+              take: perSourceTake,
+              select,
+            }),
+          ),
+        );
+
+        const diversified = interleaveBySource(sourceBuckets);
+        const start = (page - 1) * pageSize;
+        return diversified.slice(start, start + pageSize);
+      })()
+    : await prisma.collectibleListing.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select,
+      });
 
   return NextResponse.json({
     items: items.map((item) => ({

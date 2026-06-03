@@ -9,22 +9,48 @@ function asCsv(value: string | null): string[] {
   return value.split(",").map((v) => v.trim()).filter(Boolean);
 }
 
-function interleaveBySource<T extends { sourcePlatform: string }>(itemsBySource: T[][]) {
-  const merged: T[] = [];
-  let appended = true;
+function softDiversifyBySource<T extends { sourcePlatform: string }>(
+  items: T[],
+  pageSize: number,
+  page: number,
+) {
+  const target = page * pageSize;
+  const blocks: T[] = [];
+  const maxPerSource = Math.ceil(pageSize / 2);
+  const queue = [...items];
+  const deferred: T[] = [];
 
-  for (let index = 0; appended; index += 1) {
-    appended = false;
+  while (blocks.length < target && (queue.length || deferred.length)) {
+    const perPageCounts = new Map<string, number>();
+    const pageItems: T[] = [];
+    const spillover: T[] = [];
 
-    for (const bucket of itemsBySource) {
-      const item = bucket[index];
-      if (!item) continue;
-      merged.push(item);
-      appended = true;
+    while (pageItems.length < pageSize && queue.length) {
+      const candidate = queue.shift() as T;
+      const currentCount = perPageCounts.get(candidate.sourcePlatform) ?? 0;
+
+      if (currentCount < maxPerSource) {
+        pageItems.push(candidate);
+        perPageCounts.set(candidate.sourcePlatform, currentCount + 1);
+      } else {
+        spillover.push(candidate);
+      }
     }
+
+    while (pageItems.length < pageSize && deferred.length) {
+      pageItems.push(deferred.shift() as T);
+    }
+
+    while (pageItems.length < pageSize && spillover.length) {
+      pageItems.push(spillover.shift() as T);
+    }
+
+    deferred.push(...spillover);
+    blocks.push(...pageItems);
   }
 
-  return merged;
+  const start = (page - 1) * pageSize;
+  return blocks.slice(start, start + pageSize);
 }
 
 export async function GET(req: NextRequest) {
@@ -105,40 +131,15 @@ export async function GET(req: NextRequest) {
 
   const items = shouldDiversifyAll
     ? await (async () => {
-        const sourceRows = await prisma.collectibleListing.groupBy({
-          by: ["sourcePlatform"],
+        const candidateTake = Math.max(page * pageSize * 6, 96);
+        const candidates = await prisma.collectibleListing.findMany({
           where,
-          _count: {
-            _all: true,
-          },
-          orderBy: {
-            _count: {
-              sourcePlatform: "desc",
-            },
-          },
+          orderBy,
+          take: candidateTake,
+          select,
         });
 
-        const sourcePlatforms = sourceRows.map((row) => row.sourcePlatform);
-        const sourceCount = Math.max(sourcePlatforms.length, 1);
-        const perSourceTake = Math.max(Math.ceil((page * pageSize) / sourceCount) + 6, 12);
-
-        const sourceBuckets = await Promise.all(
-          sourcePlatforms.map((sourcePlatform) =>
-            prisma.collectibleListing.findMany({
-              where: {
-                ...where,
-                sourcePlatform,
-              },
-              orderBy,
-              take: perSourceTake,
-              select,
-            }),
-          ),
-        );
-
-        const diversified = interleaveBySource(sourceBuckets);
-        const start = (page - 1) * pageSize;
-        return diversified.slice(start, start + pageSize);
+        return softDiversifyBySource(candidates, pageSize, page);
       })()
     : await prisma.collectibleListing.findMany({
         where,

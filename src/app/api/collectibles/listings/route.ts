@@ -18,38 +18,60 @@ function softDiversifyBySource<T extends { sourcePlatform: string; listedAt: Dat
   pageSize: number,
   page: number,
 ) {
-  const target = page * pageSize;
-  const maxConsecutivePerSource = Math.max(2, Math.ceil(pageSize / 5));
+  const numSources = itemsBySource.filter((b) => b.length > 0).length || 1;
+  // Hard cap: no platform may contribute more than ~40% of a page (floor at 2 so small pages work)
+  const maxTotalPerSource = Math.max(2, Math.floor(pageSize * 0.4));
+  // Soft consecutive cap: max 2 in a row before yielding to another platform
+  const maxConsecutive = 2;
+
   const cursors = new Array(itemsBySource.length).fill(0);
+  // Track how many items each platform has contributed to the CURRENT page
+  const pageContribs = new Array(itemsBySource.length).fill(0);
   const merged: T[] = [];
-  let lastSource: string | null = null;
+  let lastBucketIndex = -1;
   let currentRun = 0;
+  const target = page * pageSize;
 
   while (merged.length < target) {
     let bestBucketIndex = -1;
     let bestBucketItem: T | null = null;
 
-    for (let index = 0; index < itemsBySource.length; index += 1) {
-      const candidate = itemsBySource[index][cursors[index]];
+    // Pass 1: respect both the consecutive cap AND the total-per-page cap
+    for (let i = 0; i < itemsBySource.length; i++) {
+      const candidate = itemsBySource[i][cursors[i]];
       if (!candidate) continue;
-
-      const isRunBlocked =
-        candidate.sourcePlatform === lastSource && currentRun >= maxConsecutivePerSource;
-      if (isRunBlocked) continue;
-
+      // Skip if this platform has hit the consecutive run cap
+      if (i === lastBucketIndex && currentRun >= maxConsecutive) continue;
+      // Skip if this platform has hit the total-per-page cap
+      if (pageContribs[i] >= maxTotalPerSource) continue;
       if (!bestBucketItem || getTimestampScore(candidate) > getTimestampScore(bestBucketItem)) {
         bestBucketItem = candidate;
-        bestBucketIndex = index;
+        bestBucketIndex = i;
       }
     }
 
+    // Pass 2 (fallback): if all remaining candidates are blocked by consecutive cap,
+    // relax it but still respect the total-per-page cap
     if (!bestBucketItem) {
-      for (let index = 0; index < itemsBySource.length; index += 1) {
-        const candidate = itemsBySource[index][cursors[index]];
+      for (let i = 0; i < itemsBySource.length; i++) {
+        const candidate = itemsBySource[i][cursors[i]];
+        if (!candidate) continue;
+        if (pageContribs[i] >= maxTotalPerSource) continue;
+        if (!bestBucketItem || getTimestampScore(candidate) > getTimestampScore(bestBucketItem)) {
+          bestBucketItem = candidate;
+          bestBucketIndex = i;
+        }
+      }
+    }
+
+    // Pass 3 (last resort): everything is capped, just take the freshest remaining
+    if (!bestBucketItem) {
+      for (let i = 0; i < itemsBySource.length; i++) {
+        const candidate = itemsBySource[i][cursors[i]];
         if (!candidate) continue;
         if (!bestBucketItem || getTimestampScore(candidate) > getTimestampScore(bestBucketItem)) {
           bestBucketItem = candidate;
-          bestBucketIndex = index;
+          bestBucketIndex = i;
         }
       }
     }
@@ -58,12 +80,18 @@ function softDiversifyBySource<T extends { sourcePlatform: string; listedAt: Dat
 
     merged.push(bestBucketItem);
     cursors[bestBucketIndex] += 1;
+    pageContribs[bestBucketIndex] += 1;
 
-    if (bestBucketItem.sourcePlatform === lastSource) {
+    if (bestBucketIndex === lastBucketIndex) {
       currentRun += 1;
     } else {
-      lastSource = bestBucketItem.sourcePlatform;
+      lastBucketIndex = bestBucketIndex;
       currentRun = 1;
+    }
+
+    // Reset per-page contribution counts when we finish a full page
+    if (merged.length % pageSize === 0) {
+      pageContribs.fill(0);
     }
   }
 

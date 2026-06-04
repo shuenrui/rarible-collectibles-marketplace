@@ -45,6 +45,8 @@ type CourtyardDiscoveryOptions = {
 
 type CourtyardActiveIngestOptions = {
   categoryFilters?: string[];
+  /** Filter by grading company, e.g. ["PSA"], ["BGS"]. Maps to Algolia facetFilter on metadata.Grader. */
+  graderFilters?: string[];
   /** [minUsd, maxUsd] — null means unbounded. Translates to Algolia numericFilters on latestListing.price.amount.usd. */
   priceRange?: [number | null, number | null];
   maxPages?: number;
@@ -320,6 +322,7 @@ async function fetchCourtyardSearchPage(
   page: number,
   categoryFilters: string[],
   priceRange?: [number | null, number | null],
+  graderFilters?: string[],
 ): Promise<AlgoliaResult> {
   const numericFilters: string[] = [];
   if (priceRange) {
@@ -327,6 +330,12 @@ async function fetchCourtyardSearchPage(
     if (min !== null) numericFilters.push(`latestListing.price.amount.usd>=${min}`);
     if (max !== null) numericFilters.push(`latestListing.price.amount.usd<${max}`);
   }
+
+  // Build Algolia AND-of-OR facetFilters:
+  // [[cat1, cat2], [grader1, grader2]] = (cat1 OR cat2) AND (grader1 OR grader2)
+  const facetFilters: string[][] = [];
+  if (categoryFilters.length) facetFilters.push(categoryFilters.map((category) => `metadata.Category:${category}`));
+  if (graderFilters?.length) facetFilters.push(graderFilters.map((grader) => `metadata.Grader:${grader}`));
 
   const searchRequest = {
     indexName: COURTYARD_INDEX,
@@ -357,7 +366,7 @@ async function fetchCourtyardSearchPage(
     page,
     query: "",
     userToken: "anonymous-codex-courtyard",
-    ...(categoryFilters.length ? { facetFilters: [categoryFilters.map((category) => `metadata.Category:${category}`)] } : {}),
+    ...(facetFilters.length ? { facetFilters } : {}),
   };
 
   const facetRequest = {
@@ -459,6 +468,7 @@ async function fetchCourtyardAssetWithRetry(
 
 export async function ingestCourtyardActiveListings(options: CourtyardActiveIngestOptions = {}): Promise<AdapterOutput> {
   const categoryFilters = options.categoryFilters || [];
+  const graderFilters = options.graderFilters || [];
   const priceRange = options.priceRange;
   const delayMs = options.delayMs ?? 0;
   const maxPages = options.maxPages && options.maxPages > 0 ? options.maxPages : Number.POSITIVE_INFINITY;
@@ -474,7 +484,7 @@ export async function ingestCourtyardActiveListings(options: CourtyardActiveInge
   while (page < nbPages && page < maxPages) {
     let searchResult: AlgoliaResult;
     try {
-      searchResult = await fetchCourtyardSearchPage(page, categoryFilters, priceRange);
+      searchResult = await fetchCourtyardSearchPage(page, categoryFilters, priceRange, graderFilters);
     } catch (error) {
       errors.push({
         sourceId: `page-${page}`,

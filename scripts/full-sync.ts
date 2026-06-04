@@ -74,6 +74,11 @@ async function syncCourtyard(categoryFilters?: string[]) {
   return { fetched: output.upserts.length, upserted };
 }
 
+// Top grading companies on Courtyard. Used as a 3rd dimension in the enhanced
+// bucket sync to reach graded items not captured by price-only queries.
+// Raw/ungraded items are caught by the price-tier pass (no grader filter).
+const COURTYARD_GRADERS = ["PSA", "BGS", "CGC", "SGC"];
+
 // Price tiers verified to keep each Algolia bucket under 5,040 hits for the
 // largest categories (Pokémon). Tiers are exclusive on the right: [min, max).
 // null means unbounded. Tested 2026-06-04 against live Courtyard Algolia index.
@@ -88,16 +93,35 @@ const COURTYARD_PRICE_TIERS: Array<[number | null, number | null]> = [
   [2000, null],    // $2k+     ~0.4k Pokémon
 ];
 
-async function syncCourtyardWithPriceRange(categoryFilters: string[], priceRange: [number | null, number | null]) {
+async function syncCourtyardWithPriceRange(categoryFilters: string[], priceRange: [number | null, number | null], graderFilters?: string[]) {
   const [min, max] = priceRange;
   const priceLabel = `$${min ?? 0}–${max ?? "∞"}`;
   const catLabel = categoryFilters.length ? categoryFilters.join(", ") : "global";
-  console.log(`  ▸ [${catLabel}] ${priceLabel}…`);
+  const graderLabel = graderFilters?.length ? ` [${graderFilters.join("/")}]` : "";
+  console.log(`  ▸ [${catLabel}]${graderLabel} ${priceLabel}…`);
   const output = await ingestCourtyardActiveListings({
     maxPages: 110,
     delayMs: 80,
     categoryFilters,
+    graderFilters,
     priceRange,
+  });
+  const upserted = await upsertNormalizedListings(output.upserts);
+  console.log(`    ✓ fetched=${output.upserts.length} upserted=${upserted} errors=${output.errors.length}`);
+  return { fetched: output.upserts.length, upserted };
+}
+
+async function syncCourtyardWithGraderOnly(categoryFilters: string[], graderFilters: string[]) {
+  // Catches graded items that may lack a USD price in the Algolia index
+  // and thus aren't reachable via price-tier queries alone.
+  const catLabel = categoryFilters.length ? categoryFilters.join(", ") : "global";
+  const graderLabel = graderFilters.join("/");
+  console.log(`  ▸ [${catLabel}] grader=${graderLabel} (no price filter)…`);
+  const output = await ingestCourtyardActiveListings({
+    maxPages: 110,
+    delayMs: 80,
+    categoryFilters,
+    graderFilters,
   });
   const upserted = await upsertNormalizedListings(output.upserts);
   console.log(`    ✓ fetched=${output.upserts.length} upserted=${upserted} errors=${output.errors.length}`);
@@ -145,6 +169,54 @@ async function syncCourtyardBuckets() {
   console.log(`✓ Marked ${cancelled} stale Courtyard listings as cancelled`);
 
   console.log(`\n✓ Courtyard buckets sync — totalFetched=${totalFetched} totalUpserted=${totalUpserted} staleMarked=${cancelled}`);
+}
+
+/**
+ * Enhanced 3-dimension sync: category × grader × price-tier.
+ * Reaches graded items not accessible via price-only queries (items where
+ * latestListing.price.amount.usd is null in Algolia). Expected to push
+ * Courtyard coverage from ~40-60k toward 150k+.
+ *
+ * Modes:
+ *   Phase 1 (grader-only): category × each grader, no price filter  → catches unpriced graded items
+ *   Phase 2 (grader+price): category × grader × price tier          → extra coverage for dense grader buckets
+ */
+async function syncCourtyardGraders() {
+  const syncStartedAt = new Date();
+  console.log(
+    `▶ Courtyard 3-dim sync — ${COURTYARD_CATEGORIES.length} categories × ${COURTYARD_GRADERS.length} graders × (1 no-price + ${COURTYARD_PRICE_TIERS.length} price tiers)…`,
+  );
+  let totalFetched = 0;
+  let totalUpserted = 0;
+
+  // Phase 1: per category × grader (no price filter) — catches unpriced graded items
+  for (const cat of COURTYARD_CATEGORIES) {
+    console.log(`\n▶ Category: ${cat} — grader-only pass`);
+    for (const grader of COURTYARD_GRADERS) {
+      const result = await syncCourtyardWithGraderOnly([cat], [grader]);
+      totalFetched += result.fetched;
+      totalUpserted += result.upserted;
+    }
+  }
+
+  // Phase 2: per category × grader × price tier — additional coverage for dense sub-groups
+  for (const cat of COURTYARD_CATEGORIES) {
+    console.log(`\n▶ Category: ${cat} — grader × price-tier pass`);
+    for (const grader of COURTYARD_GRADERS) {
+      for (const tier of COURTYARD_PRICE_TIERS) {
+        const result = await syncCourtyardWithPriceRange([cat], tier, [grader]);
+        totalFetched += result.fetched;
+        totalUpserted += result.upserted;
+      }
+    }
+  }
+
+  // Mark stale listings
+  console.log("\n▶ Cleaning up stale Courtyard listings…");
+  const cancelled = await markStaleCourtyardListings(syncStartedAt);
+  console.log(`✓ Marked ${cancelled} stale Courtyard listings as cancelled`);
+
+  console.log(`\n✓ Courtyard graders sync — totalFetched=${totalFetched} totalUpserted=${totalUpserted} staleMarked=${cancelled}`);
 }
 
 async function syncCourtyardAll() {
@@ -227,6 +299,10 @@ async function main() {
     case "courtyard-buckets":
       await syncCourtyardBuckets();
       break;
+    case "courtyard-graders":
+      // 3-dim: category × grader × price-tier. Run AFTER courtyard-buckets for maximum coverage.
+      await syncCourtyardGraders();
+      break;
     case "all-deep":
       await syncCourtyardAll();
       await syncBeezie();
@@ -239,8 +315,16 @@ async function main() {
       await syncCollectorCrypt();
       await syncPhygitals();
       break;
+    case "all-graders":
+      // Maximum Courtyard coverage: buckets + grader dimension, then all other sources.
+      await syncCourtyardBuckets();
+      await syncCourtyardGraders();
+      await syncBeezie();
+      await syncCollectorCrypt();
+      await syncPhygitals();
+      break;
     default:
-      console.error(`Unknown mode: ${mode}. Use: courtyard | courtyard-all | courtyard-buckets | beezie | collectorcrypt | phygitals | all | all-deep | all-buckets`);
+      console.error(`Unknown mode: ${mode}. Use: courtyard | courtyard-all | courtyard-buckets | courtyard-graders | beezie | collectorcrypt | phygitals | all | all-deep | all-buckets | all-graders`);
       process.exit(1);
   }
 

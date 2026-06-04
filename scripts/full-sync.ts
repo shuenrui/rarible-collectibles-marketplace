@@ -252,8 +252,8 @@ async function syncBeezie() {
 }
 
 async function syncCollectorCrypt() {
-  console.log("▶ Collector Crypt sync — up to 50 pages…");
-  const output = await ingestCollectorCryptActiveListings({ maxPages: 50, pageSize: 100, delayMs: 80 });
+  console.log("▶ Collector Crypt sync — up to 100 pages (API has ~80 pages / 7,927 active listings)…");
+  const output = await ingestCollectorCryptActiveListings({ maxPages: 100, pageSize: 100, delayMs: 80 });
   const upserted = await upsertNormalizedListings(output.upserts);
   console.log(`✓ Collector Crypt — fetched=${output.upserts.length} upserted=${upserted} errors=${output.errors.length}`);
   return { fetched: output.upserts.length, upserted };

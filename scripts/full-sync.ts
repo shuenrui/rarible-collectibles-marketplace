@@ -4,7 +4,7 @@
  * Modes:
  *   courtyard        — global sync (up to 5,040 newest listings via Algolia)
  *   courtyard-all    — sync each major Courtyard category separately (~39k total)
- *   beezie           — Beezie sync (~750 listings)
+ *   beezie           — Beezie sync (deep per-category crawl, ~4k+ reachable today)
  *   collectorcrypt   — Collector Crypt sync (up to 5,000)
  *   phygitals        — Phygitals active listings full sync (~9k)
  *   all              — courtyard + beezie + collectorcrypt + phygitals (global only)
@@ -90,8 +90,12 @@ async function syncCourtyardAll() {
 }
 
 async function syncBeezie() {
-  console.log("▶ Beezie sync…");
-  const output = await ingestBeezieActiveListings({ maxPagesPerCategory: 20, delayMs: 50 });
+  console.log("▶ Beezie sync — up to 50 pages × 100 items per category…");
+  const output = await ingestBeezieActiveListings({
+    maxPagesPerCategory: 50,
+    pageSize: 100,
+    delayMs: 50,
+  });
   const upserted = await upsertNormalizedListings(output.upserts);
   console.log(`✓ Beezie — fetched=${output.upserts.length} upserted=${upserted} errors=${output.errors.length}`);
   return { fetched: output.upserts.length, upserted };

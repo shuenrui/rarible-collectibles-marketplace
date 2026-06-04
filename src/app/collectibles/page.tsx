@@ -37,7 +37,7 @@ function timeAgo(isoString: string): string {
 }
 
 type Facet = { value: string; count: number };
-type TabId = "buy" | "drops" | "auctions" | "ending" | "new";
+type TabId = "buy" | "drops" | "packs" | "auctions" | "ending" | "new";
 
 const PLATFORM_LABELS: Record<string, string> = {
   courtyard: "Courtyard",
@@ -189,6 +189,10 @@ export default function CollectiblesPage() {
       if (activeTab === "drops") {
         params.set("category", activeCategory !== "all" ? activeCategory : "sealed_products");
         params.set("sort", "updated_desc");
+      } else if (activeTab === "packs") {
+        // Packs: sealed product catalog, price-asc by default, IP filter still respected
+        params.set("category", activeCategory !== "all" ? activeCategory : "sealed_products");
+        params.set("sort", sort === "price_desc" ? "price_desc" : sort === "updated_desc" ? "updated_desc" : "price_asc");
       } else {
         if (activeCategory !== "all") params.set("category", activeCategory);
         if (activeTab === "new" || sort === "updated_desc") params.set("sort", "updated_desc");
@@ -253,6 +257,7 @@ export default function CollectiblesPage() {
   const tabs: Array<{ id: TabId; label: string }> = [
     { id: "buy", label: "Buy Now" },
     { id: "drops", label: "🔥 Drops" },
+    { id: "packs", label: "📦 Packs" },
     { id: "new", label: "New Listings" },
     { id: "ending", label: "Ending Soon" },
     { id: "auctions", label: "Auctions" },
@@ -697,6 +702,42 @@ export default function CollectiblesPage() {
             </div>
           )}
 
+          {/* Packs hero banner */}
+          {activeTab === "packs" && (
+            <div className="mb-5 border-2 border-emerald-500/30 bg-gradient-to-r from-[#001A0A] to-[#0A0A0A] p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-mono text-[10px] font-bold tracking-[0.25em] text-emerald-400">📦 PACKS</p>
+                  <h2 className="mt-1 text-xl font-black leading-tight text-white">Sealed Product Marketplace</h2>
+                  <p className="mt-1 font-mono text-[11px] text-white/50">
+                    Booster boxes, packs &amp; sealed sets · sorted by price · find the best deal
+                  </p>
+                </div>
+                {!loading && (
+                  <div className="shrink-0 text-right">
+                    <p className="font-mono text-2xl font-black text-emerald-400">{totalItems.toLocaleString()}</p>
+                    <p className="font-mono text-[9px] text-white/40">SEALED LISTINGS</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["price_asc", "price_desc", "updated_desc"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSort(s)}
+                    className={`border px-3 py-1 font-mono text-[9px] font-bold tracking-widest ${
+                      sort === s || (activeTab === "packs" && s === "price_asc" && !["price_desc","updated_desc"].includes(sort))
+                        ? "border-emerald-400 text-emerald-400"
+                        : "border-white/20 text-white/40"
+                    }`}
+                  >
+                    {s === "price_asc" ? "LOWEST PRICE" : s === "price_desc" ? "HIGHEST PRICE" : "NEWEST"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Active filter chips */}
           {(activeGrade !== "all" || activePlatform !== "all" || hasPriceFilter) && (
             <div className="mb-4 flex flex-wrap gap-2">
@@ -756,7 +797,7 @@ export default function CollectiblesPage() {
                           }}
                         />
                         <div className="absolute left-1 top-1 bg-[#0A0A0A] px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#FEDB02]">
-                          {item.gradeValue || item.gradeNormalized || "UNKNOWN"}
+                          {activeTab === "packs" ? "SEALED" : (item.gradeValue || item.gradeNormalized || "UNKNOWN")}
                         </div>
                         {/* NEW badge for recently listed items */}
                         {isNew && (

@@ -45,6 +45,8 @@ type CourtyardDiscoveryOptions = {
 
 type CourtyardActiveIngestOptions = {
   categoryFilters?: string[];
+  /** [minUsd, maxUsd] — null means unbounded. Translates to Algolia numericFilters on latestListing.price.amount.usd. */
+  priceRange?: [number | null, number | null];
   maxPages?: number;
   delayMs?: number;
   hydrationConcurrency?: number;
@@ -314,10 +316,22 @@ async function fetchTokenMetadata(tokenUri: string): Promise<MetadataPayload | n
   }
 }
 
-async function fetchCourtyardSearchPage(page: number, categoryFilters: string[]): Promise<AlgoliaResult> {
+async function fetchCourtyardSearchPage(
+  page: number,
+  categoryFilters: string[],
+  priceRange?: [number | null, number | null],
+): Promise<AlgoliaResult> {
+  const numericFilters: string[] = [];
+  if (priceRange) {
+    const [min, max] = priceRange;
+    if (min !== null) numericFilters.push(`latestListing.price.amount.usd>=${min}`);
+    if (max !== null) numericFilters.push(`latestListing.price.amount.usd<${max}`);
+  }
+
   const searchRequest = {
     indexName: COURTYARD_INDEX,
     attributesToRetrieve: ["proofOfIntegrity", "dealScore"],
+    ...(numericFilters.length ? { numericFilters } : {}),
     facets: [
       "estimatedValueUsd",
       "latestListing.price.amount.usd",
@@ -445,6 +459,7 @@ async function fetchCourtyardAssetWithRetry(
 
 export async function ingestCourtyardActiveListings(options: CourtyardActiveIngestOptions = {}): Promise<AdapterOutput> {
   const categoryFilters = options.categoryFilters || [];
+  const priceRange = options.priceRange;
   const delayMs = options.delayMs ?? 0;
   const maxPages = options.maxPages && options.maxPages > 0 ? options.maxPages : Number.POSITIVE_INFINITY;
   const hydrationConcurrency = Math.max(1, Math.min(20, options.hydrationConcurrency ?? 5));
@@ -459,7 +474,7 @@ export async function ingestCourtyardActiveListings(options: CourtyardActiveInge
   while (page < nbPages && page < maxPages) {
     let searchResult: AlgoliaResult;
     try {
-      searchResult = await fetchCourtyardSearchPage(page, categoryFilters);
+      searchResult = await fetchCourtyardSearchPage(page, categoryFilters, priceRange);
     } catch (error) {
       errors.push({
         sourceId: `page-${page}`,

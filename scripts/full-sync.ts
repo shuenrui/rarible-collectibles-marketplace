@@ -6,8 +6,9 @@
  *   courtyard-all    — sync each major Courtyard category separately (~39k total)
  *   beezie           — Beezie sync (~750 listings)
  *   collectorcrypt   — Collector Crypt sync (up to 5,000)
- *   all              — courtyard + beezie + collectorcrypt (global only)
- *   all-deep         — courtyard-all + beezie + collectorcrypt (deepest coverage)
+ *   phygitals        — Phygitals active listings full sync (~9k)
+ *   all              — courtyard + beezie + collectorcrypt + phygitals (global only)
+ *   all-deep         — courtyard-all + beezie + collectorcrypt + phygitals (deepest coverage)
  *
  * Usage:
  *   DATABASE_URL=... DIRECT_URL=... tsx scripts/full-sync.ts [mode]
@@ -15,6 +16,7 @@
 import { ingestCourtyardActiveListings } from "../src/lib/adapters/courtyard";
 import { ingestBeezieActiveListings } from "../src/lib/adapters/beezie";
 import { ingestCollectorCryptActiveListings } from "../src/lib/adapters/collectorcrypt";
+import { ingestPhygitalsActiveListings } from "../src/lib/adapters/phygitals";
 import { upsertNormalizedListings } from "../src/lib/adapters/persist";
 
 const mode = process.argv[2] ?? "courtyard";
@@ -103,6 +105,14 @@ async function syncCollectorCrypt() {
   return { fetched: output.upserts.length, upserted };
 }
 
+async function syncPhygitals() {
+  console.log("▶ Phygitals active listings — up to 100 pages × 100 items (~10k)…");
+  const output = await ingestPhygitalsActiveListings({ maxPages: 100, pageSize: 100, delayMs: 100 });
+  const upserted = await upsertNormalizedListings(output.upserts);
+  console.log(`✓ Phygitals — fetched=${output.upserts.length} upserted=${upserted} errors=${output.errors.length}`);
+  return { fetched: output.upserts.length, upserted };
+}
+
 async function main() {
   console.log(`\n=== Full sync (mode=${mode}) ${new Date().toISOString()} ===\n`);
   const start = Date.now();
@@ -120,18 +130,23 @@ async function main() {
     case "collectorcrypt":
       await syncCollectorCrypt();
       break;
+    case "phygitals":
+      await syncPhygitals();
+      break;
     case "all":
       await syncCourtyard();
       await syncBeezie();
       await syncCollectorCrypt();
+      await syncPhygitals();
       break;
     case "all-deep":
       await syncCourtyardAll();
       await syncBeezie();
       await syncCollectorCrypt();
+      await syncPhygitals();
       break;
     default:
-      console.error(`Unknown mode: ${mode}. Use: courtyard | courtyard-all | beezie | collectorcrypt | all | all-deep`);
+      console.error(`Unknown mode: ${mode}. Use: courtyard | courtyard-all | beezie | collectorcrypt | phygitals | all | all-deep`);
       process.exit(1);
   }
 

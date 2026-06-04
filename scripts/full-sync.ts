@@ -177,12 +177,14 @@ async function syncCourtyardBuckets() {
  * latestListing.price.amount.usd is null in Algolia). Expected to push
  * Courtyard coverage from ~40-60k toward 150k+.
  *
+ * NOTE: Does NOT run stale cleanup — call markStaleCourtyardListings with the
+ * overall run's syncStartedAt after all passes complete.
+ *
  * Modes:
  *   Phase 1 (grader-only): category × each grader, no price filter  → catches unpriced graded items
  *   Phase 2 (grader+price): category × grader × price tier          → extra coverage for dense grader buckets
  */
 async function syncCourtyardGraders() {
-  const syncStartedAt = new Date();
   console.log(
     `▶ Courtyard 3-dim sync — ${COURTYARD_CATEGORIES.length} categories × ${COURTYARD_GRADERS.length} graders × (1 no-price + ${COURTYARD_PRICE_TIERS.length} price tiers)…`,
   );
@@ -211,12 +213,7 @@ async function syncCourtyardGraders() {
     }
   }
 
-  // Mark stale listings
-  console.log("\n▶ Cleaning up stale Courtyard listings…");
-  const cancelled = await markStaleCourtyardListings(syncStartedAt);
-  console.log(`✓ Marked ${cancelled} stale Courtyard listings as cancelled`);
-
-  console.log(`\n✓ Courtyard graders sync — totalFetched=${totalFetched} totalUpserted=${totalUpserted} staleMarked=${cancelled}`);
+  console.log(`\n✓ Courtyard graders sync — totalFetched=${totalFetched} totalUpserted=${totalUpserted}`);
 }
 
 async function syncCourtyardAll() {
@@ -315,14 +312,22 @@ async function main() {
       await syncCollectorCrypt();
       await syncPhygitals();
       break;
-    case "all-graders":
-      // Maximum Courtyard coverage: buckets + grader dimension, then all other sources.
-      await syncCourtyardBuckets();
-      await syncCourtyardGraders();
+    case "all-graders": {
+      // Maximum Courtyard coverage: buckets (no cleanup) + grader dimension + all other sources,
+      // then ONE stale cleanup at the very end so buckets-run items aren't incorrectly purged.
+      const allGradersStartedAt = new Date();
+      await syncCourtyardBuckets(); // includes its own stale cleanup with its own syncStartedAt
+      await syncCourtyardGraders(); // no cleanup — extends coverage from the buckets run
+      // Re-run stale cleanup with the overall start time: marks any Courtyard listing not touched
+      // by EITHER the buckets or graders pass as cancelled.
+      console.log("\n▶ Final stale cleanup (all-graders run)…");
+      const staleCount = await markStaleCourtyardListings(allGradersStartedAt);
+      console.log(`✓ Marked ${staleCount} stale Courtyard listings as cancelled`);
       await syncBeezie();
       await syncCollectorCrypt();
       await syncPhygitals();
       break;
+    }
     default:
       console.error(`Unknown mode: ${mode}. Use: courtyard | courtyard-all | courtyard-buckets | courtyard-graders | beezie | collectorcrypt | phygitals | all | all-deep | all-buckets | all-graders`);
       process.exit(1);

@@ -90,10 +90,13 @@ async function syncCourtyardAll() {
 }
 
 async function syncBeezie() {
-  console.log("▶ Beezie sync — up to 50 pages × 100 items per category…");
+  // Beezie API returns 40 items/page regardless of requested pageSize.
+  // Use pageSize:40 (the natural size) and allow enough pages to cover the
+  // largest category — Pokémon currently has ~4,095 items @ 40/page = ~103 pages.
+  console.log("▶ Beezie sync — up to 120 pages × 40 items per category…");
   const output = await ingestBeezieActiveListings({
-    maxPagesPerCategory: 50,
-    pageSize: 100,
+    maxPagesPerCategory: 120,
+    pageSize: 40,
     delayMs: 50,
   });
   const upserted = await upsertNormalizedListings(output.upserts);

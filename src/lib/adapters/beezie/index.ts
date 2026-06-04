@@ -199,6 +199,8 @@ export async function ingestBeezieActiveListings(options: BeezieIngestOptions = 
 
   for (const categoryId of categoryIds) {
     let page = 0;
+    let rawFetchedInCategory = 0;
+    let categoryTotal = Infinity;
 
     while (page < maxPagesPerCategory) {
       let data: BeezieListResponse;
@@ -214,9 +216,17 @@ export async function ingestBeezieActiveListings(options: BeezieIngestOptions = 
       }
 
       const items = data.dropItems || [];
+
+      // Capture total on first page so we know when to stop regardless of pageSize mismatch
+      if (page === 0 && typeof data.total === "number" && data.total > 0) {
+        categoryTotal = data.total;
+      }
+
       if (!items.length) {
         break;
       }
+
+      rawFetchedInCategory += items.length;
 
       for (const item of items) {
         const sellOrder = item.SellOrder;
@@ -288,7 +298,11 @@ export async function ingestBeezieActiveListings(options: BeezieIngestOptions = 
       pageCount += 1;
       page += 1;
 
-      if (items.length < pageSize) {
+      // Stop when we've fetched everything the API reports for this category,
+      // or when the page was truly empty. This handles the case where the API
+      // ignores our pageSize and returns a smaller fixed count per page — the
+      // old `items.length < pageSize` check would incorrectly terminate early.
+      if (rawFetchedInCategory >= categoryTotal) {
         break;
       }
 

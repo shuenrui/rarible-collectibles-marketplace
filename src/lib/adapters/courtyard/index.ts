@@ -538,7 +538,7 @@ export async function ingestCourtyardActiveListings(options: CourtyardActiveInge
               sourcePlatform: "courtyard",
               sourceListingId: listingId,
               sourceItemId: asset.collectible_id || proofOfIntegrity,
-              sourceUrl: `https://marketplace.courtyard.io/asset/${asset.collectible_id || proofOfIntegrity}`,
+              sourceUrl: `https://marketplace.courtyard.io/asset/${proofOfIntegrity}`,
               title,
               description: undefined,
               imageUrl,

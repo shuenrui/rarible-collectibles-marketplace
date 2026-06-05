@@ -1,9 +1,10 @@
 #!/bin/bash
-# Runs every minute via cron. Captures newest ~96 Courtyard listings.
-# Lock file prevents overlap if a run takes longer than 60s.
+# Runs every 30 seconds via paired cron entries. Captures newest ~96 Courtyard listings.
+# Lock file prevents overlap if a run takes longer than the cadence window.
 #
 # Install: crontab -e
 #   * * * * * /home/orangepi/projects/collectibles-marketplace/scripts/cron-latest.sh >> /tmp/cron-latest.log 2>&1
+#   * * * * * sleep 30 && /home/orangepi/projects/collectibles-marketplace/scripts/cron-latest.sh >> /tmp/cron-latest.log 2>&1
 
 set -euo pipefail
 

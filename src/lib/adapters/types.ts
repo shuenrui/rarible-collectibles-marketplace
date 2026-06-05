@@ -10,7 +10,7 @@ export type ListingImage = {
 };
 
 export type NormalizedListingUpsert = {
-  sourcePlatform: "courtyard" | "beezie" | "phygitals" | "collector_crypt" | "other";
+  sourcePlatform: "courtyard" | "beezie" | "phygitals" | "collector_crypt" | "renaiss" | "other";
   sourceListingId: string;
   sourceItemId?: string;
   sourceUrl: string;

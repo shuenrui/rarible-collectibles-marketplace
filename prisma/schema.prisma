@@ -13,6 +13,7 @@ enum SourcePlatform {
   courtyard
   beezie
   collector_crypt
+  renaiss
   other
 }
 

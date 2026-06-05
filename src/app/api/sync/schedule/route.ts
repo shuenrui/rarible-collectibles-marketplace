@@ -2,6 +2,7 @@ import { ingestCollectorCryptActiveListings } from "@/lib/adapters/collectorcryp
 import { ingestBeezieActiveListings } from "@/lib/adapters/beezie";
 import { ingestCourtyardActiveListings } from "@/lib/adapters/courtyard";
 import { ingestPhygitalsActiveListings, ingestPhygitalsSales } from "@/lib/adapters/phygitals";
+import { ingestRenaissActiveListings } from "@/lib/adapters/renaiss";
 import { upsertNormalizedListings } from "@/lib/adapters/persist";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,12 +16,13 @@ type SyncJobResult = {
   config: Record<string, unknown>;
 };
 
-function asMode(value: string | null): "courtyard" | "beezie" | "phygitals" | "collectorcrypt" | "all" {
+function asMode(value: string | null): "courtyard" | "beezie" | "phygitals" | "collectorcrypt" | "renaiss" | "all" {
   if (
     value === "courtyard" ||
     value === "beezie" ||
     value === "phygitals" ||
     value === "collectorcrypt" ||
+    value === "renaiss" ||
     value === "all"
   ) {
     return value;
@@ -149,15 +151,42 @@ async function runCollectorCryptIncremental(): Promise<SyncJobResult> {
   };
 }
 
+async function runRenaissIncremental(): Promise<SyncJobResult> {
+  const config = {
+    max_pages: 5,
+    page_size: 100,
+    delay_ms: 150,
+    cadence: "every 30 minutes",
+  };
+
+  const output = await ingestRenaissActiveListings({
+    maxPages: Number(config.max_pages),
+    pageSize: Number(config.page_size),
+    delayMs: Number(config.delay_ms),
+    listedOnly: true,
+  });
+
+  const upserted = await upsertNormalizedListings(output.upserts);
+
+  return {
+    fetched: output.upserts.length,
+    upserted,
+    errors: output.errors,
+    checkpoint: output.checkpoint.lastProcessedBlock.toString(),
+    config,
+  };
+}
+
 export async function POST(req: NextRequest) {
   const mode = asMode(req.nextUrl.searchParams.get("mode"));
 
   const response: {
-    mode: "courtyard" | "beezie" | "phygitals" | "collectorcrypt" | "all";
+    mode: "courtyard" | "beezie" | "phygitals" | "collectorcrypt" | "renaiss" | "all";
     courtyard?: SyncJobResult;
     beezie?: SyncJobResult;
     phygitals?: SyncJobResult;
     collectorcrypt?: SyncJobResult;
+    renaiss?: SyncJobResult;
     notes: string[];
   } = {
     mode,
@@ -181,6 +210,10 @@ export async function POST(req: NextRequest) {
 
   if (mode === "collectorcrypt" || mode === "all") {
     response.collectorcrypt = await runCollectorCryptIncremental();
+  }
+
+  if (mode === "renaiss" || mode === "all") {
+    response.renaiss = await runRenaissIncremental();
   }
 
   return NextResponse.json(response);

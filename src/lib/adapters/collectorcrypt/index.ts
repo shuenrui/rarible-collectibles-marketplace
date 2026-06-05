@@ -149,10 +149,10 @@ function buildImages(item: CollectorCryptItem): { imageUrl: string; images: List
 }
 
 function buildSourceUrl(item: CollectorCryptItem): string {
-  // CC JS bundle uses /cards/:identifier routing. nftAddress (Solana mint) is the canonical
-  // on-chain identifier; fall back to internal id if nftAddress is absent.
-  const identifier = item.nftAddress || item.id;
-  return `${COLLECTORCRYPT_SITE_BASE}/cards/${identifier}`;
+  // CC's NFT_CARD_ROUTE is /assets/:blockchain/:cardAddress — blockchain is always "solana"
+  // for CC items; cardAddress is the Solana mint (nftAddress).
+  const cardAddress = item.nftAddress || item.id;
+  return `${COLLECTORCRYPT_SITE_BASE}/assets/solana/${cardAddress}`;
 }
 
 function getSellerAddress(item: CollectorCryptItem, listing?: CollectorCryptListing): string | undefined {

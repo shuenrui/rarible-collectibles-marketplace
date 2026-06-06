@@ -62,7 +62,7 @@ async function batchUpsert(items: NormalizedListingUpsert[]): Promise<void> {
       item.sellerVerified ?? false,
       item.syncConfidence ?? 50,
       item.dataQualityFlags != null ? JSON.stringify(item.dataQualityFlags) : null,
-      item.rawSourcePayload != null ? JSON.stringify(item.rawSourcePayload) : null,
+      null, // rawSourcePayload — not stored to keep DB size small
       new Date(item.syncedAt).toISOString(),
     );
 

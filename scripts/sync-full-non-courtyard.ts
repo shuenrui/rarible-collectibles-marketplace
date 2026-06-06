@@ -17,7 +17,6 @@ import { upsertNormalizedListings } from "../src/lib/adapters/persist";
 import { prisma } from "../src/lib/prisma";
 import type { SourcePlatform } from "@prisma/client";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type SourceResult = {
   fetched: number;
@@ -121,14 +120,12 @@ async function main() {
   const syncStartedAt = new Date();
   const wallStart = Date.now();
 
-  // Run sequentially to keep API load gentle and avoid interleaved syncedAt timestamps.
-  const collectorcrypt = await runCollectorCrypt(syncStartedAt);
-  await sleep(200);
-  const beezie = await runBeezie(syncStartedAt);
-  await sleep(200);
-  const phygitals = await runPhygitals(syncStartedAt);
-  await sleep(200);
-  const renaiss = await runRenaiss(syncStartedAt);
+  const [collectorcrypt, beezie, phygitals, renaiss] = await Promise.all([
+    runCollectorCrypt(syncStartedAt),
+    runBeezie(syncStartedAt),
+    runPhygitals(syncStartedAt),
+    runRenaiss(syncStartedAt),
+  ]);
 
   const totalMs = Date.now() - wallStart;
 

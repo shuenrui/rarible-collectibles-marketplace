@@ -4,7 +4,6 @@ const COLLECTORCRYPT_API_BASE = "https://api.collectorcrypt.com";
 const COLLECTORCRYPT_SITE_BASE = "https://collectorcrypt.com";
 const SOLANA_CHAIN_ID = 101;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type CollectorCryptOptions = {
   maxPages?: number;
@@ -195,113 +194,139 @@ async function fetchPage(
   return (await response.json()) as CollectorCryptResponse;
 }
 
+// Fetch pages in parallel batches to avoid the ~12s/page sequential bottleneck.
+const PAGE_CONCURRENCY = 8;
+
+function processPageItems(
+  payload: CollectorCryptResponse,
+  seen: Set<string>,
+  upserts: NormalizedListingUpsert[],
+): void {
+  for (const item of payload.filterNFtCard || []) {
+    const listing = item.listing;
+    if (!listing?.price || !item.id) continue;
+
+    const sourceListingId = String(item.id);
+    if (seen.has(sourceListingId)) continue;
+    seen.add(sourceListingId);
+
+    const grader = normalizeGrader(item.gradingCompany);
+    const gradeNormalized = normalizeGrade(item.gradeNum, item.grade, grader);
+    const { imageUrl, images } = buildImages(item);
+    const updatedAt =
+      listing.updatedAt || listing.createdAt || item.updatedAt || item.createdAt || new Date().toISOString();
+    const listedAt = listing.createdAt || item.createdAt || updatedAt;
+    const price = String(listing.price);
+    const categoryL1 = normalizeCategory(item.category);
+
+    upserts.push({
+      sourcePlatform: "collector_crypt",
+      sourceListingId,
+      sourceItemId: sourceListingId,
+      sourceUrl: buildSourceUrl(item),
+      title: item.itemName || `Collector Crypt Item ${sourceListingId}`,
+      description: undefined,
+      imageUrl,
+      images,
+      categoryL1,
+      categoryL2: item.category,
+      franchise: item.category,
+      setName: item.set || undefined,
+      cardNumber: item.gradingID || undefined,
+      year: item.year != null ? Number(item.year) : undefined,
+      conditionType: item.grade ? "graded" : "unknown",
+      grader,
+      gradeValue: item.grade || undefined,
+      gradeNormalized,
+      gradeLabelRaw: item.grade || undefined,
+      listingType: "fixed_price",
+      priceAmount: price,
+      priceCurrency: listing.currency || "USDC",
+      priceUsd: price,
+      lastPriceUpdateAt: updatedAt,
+      chainId: SOLANA_CHAIN_ID,
+      contractAddress: item.nftAddress || "unknown",
+      tokenId: sourceListingId,
+      tokenStandard: mapTokenStandard(item.nftStandard || item.blockchain),
+      vaulted: Boolean(item.vault),
+      redeemable: true,
+      authProvider: grader !== "none" ? item.gradingCompany || undefined : undefined,
+      listingStatus: "active",
+      listedAt,
+      soldAt: undefined,
+      sellerAddress: getSellerAddress(item, listing),
+      sellerHandle: getSellerHandle(item),
+      sellerVerified: Boolean(item.authenticated),
+      syncConfidence: 90,
+      dataQualityFlags: {
+        source: "api.collectorcrypt.com/marketplace",
+        category: item.category,
+        marketplace: listing.marketplace,
+      },
+      rawSourcePayload: item as unknown as Record<string, unknown>,
+      syncedAt: new Date().toISOString(),
+    });
+  }
+}
+
 export async function ingestCollectorCryptActiveListings(
   options: CollectorCryptOptions = {},
 ): Promise<AdapterOutput> {
   const pageSize = Math.min(options.pageSize ?? 100, 100);
   const maxPages = options.maxPages ?? 2;
-  const delayMs = options.delayMs ?? 50;
 
   const upserts: NormalizedListingUpsert[] = [];
   const errors: Array<{ sourceId?: string; message: string }> = [];
   const seen = new Set<string>();
 
-  let pagesFetched = 0;
+  // Fetch page 1 first to discover totalPages
+  let firstPayload: CollectorCryptResponse;
+  try {
+    firstPayload = await fetchPage(1, pageSize, options.categories);
+  } catch (error) {
+    errors.push({
+      sourceId: "page=1",
+      message: error instanceof Error ? error.message : "Collector Crypt page fetch failed",
+    });
+    return {
+      upserts,
+      tombstones: [],
+      errors,
+      checkpoint: { chainId: SOLANA_CHAIN_ID, lastProcessedBlock: BigInt(0), updatedAt: new Date().toISOString() },
+    };
+  }
 
-  for (let page = 1; page <= maxPages; page += 1) {
-    let payload: CollectorCryptResponse;
+  processPageItems(firstPayload, seen, upserts);
 
-    try {
-      payload = await fetchPage(page, pageSize, options.categories);
-    } catch (error) {
-      errors.push({
-        sourceId: `page=${page}`,
-        message: error instanceof Error ? error.message : "Collector Crypt page fetch failed",
-      });
-      break;
+  const totalPages = Math.min(firstPayload.totalPages ?? 1, maxPages);
+
+  // Fetch remaining pages in parallel batches
+  for (let batchStart = 2; batchStart <= totalPages; batchStart += PAGE_CONCURRENCY) {
+    const pageNums: number[] = [];
+    for (let p = batchStart; p < batchStart + PAGE_CONCURRENCY && p <= totalPages; p++) {
+      pageNums.push(p);
     }
 
-    const items = payload.filterNFtCard || [];
-    if (!items.length) break;
+    const results = await Promise.allSettled(
+      pageNums.map((p) => fetchPage(p, pageSize, options.categories)),
+    );
 
-    for (const item of items) {
-      const listing = item.listing;
-      if (!listing?.price || !item.id) continue;
-
-      const sourceListingId = String(item.id);
-      if (seen.has(sourceListingId)) continue;
-      seen.add(sourceListingId);
-
-      const grader = normalizeGrader(item.gradingCompany);
-      const gradeNormalized = normalizeGrade(item.gradeNum, item.grade, grader);
-      const { imageUrl, images } = buildImages(item);
-      const updatedAt = listing.updatedAt || listing.createdAt || item.updatedAt || item.createdAt || new Date().toISOString();
-      const listedAt = listing.createdAt || item.createdAt || updatedAt;
-      const price = String(listing.price);
-      const categoryL1 = normalizeCategory(item.category);
-
-      upserts.push({
-        sourcePlatform: "collector_crypt",
-        sourceListingId,
-        sourceItemId: sourceListingId,
-        sourceUrl: buildSourceUrl(item),
-        title: item.itemName || `Collector Crypt Item ${sourceListingId}`,
-        description: undefined,
-        imageUrl,
-        images,
-        categoryL1,
-        categoryL2: item.category,
-        franchise: item.category,
-        setName: item.set || undefined,
-        cardNumber: item.gradingID || undefined,
-        year: item.year != null ? Number(item.year) : undefined,
-        conditionType: item.grade ? "graded" : "unknown",
-        grader,
-        gradeValue: item.grade || undefined,
-        gradeNormalized,
-        gradeLabelRaw: item.grade || undefined,
-        listingType: "fixed_price",
-        priceAmount: price,
-        priceCurrency: listing.currency || "USDC",
-        priceUsd: price,
-        lastPriceUpdateAt: updatedAt,
-        chainId: SOLANA_CHAIN_ID,
-        contractAddress: item.nftAddress || "unknown",
-        tokenId: sourceListingId,
-        tokenStandard: mapTokenStandard(item.nftStandard || item.blockchain),
-        vaulted: Boolean(item.vault),
-        redeemable: true,
-        authProvider: grader !== "none" ? item.gradingCompany || undefined : undefined,
-        listingStatus: "active",
-        listedAt,
-        soldAt: undefined,
-        sellerAddress: getSellerAddress(item, listing),
-        sellerHandle: getSellerHandle(item),
-        sellerVerified: Boolean(item.authenticated),
-        syncConfidence: 90,
-        dataQualityFlags: {
-          source: "api.collectorcrypt.com/marketplace",
-          category: item.category,
-          marketplace: listing.marketplace,
-        },
-        rawSourcePayload: item as unknown as Record<string, unknown>,
-        syncedAt: new Date().toISOString(),
-      });
-    }
-
-    pagesFetched += 1;
-
-    const totalPages = payload.totalPages ?? page;
-    if (page >= totalPages) break;
-
-    if (delayMs > 0) {
-      await sleep(delayMs);
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === "fulfilled") {
+        processPageItems(result.value, seen, upserts);
+      } else {
+        errors.push({
+          sourceId: `page=${pageNums[i]}`,
+          message: result.reason instanceof Error ? result.reason.message : "Collector Crypt page fetch failed",
+        });
+      }
     }
   }
 
   const checkpoint: AdapterCheckpoint = {
     chainId: SOLANA_CHAIN_ID,
-    lastProcessedBlock: BigInt(pagesFetched),
+    lastProcessedBlock: BigInt(totalPages),
     updatedAt: new Date().toISOString(),
   };
 

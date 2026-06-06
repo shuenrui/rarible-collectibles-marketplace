@@ -18,9 +18,9 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 if [[ -f "$LOCK" ]]; then
-  LOCK_AGE=$(( $(date +%s) - $(stat -c %Y "$LOCK") ))
-  if (( LOCK_AGE < 270 )); then
-    echo "[$(date -u +%H:%M:%S)] SKIP — previous run active (${LOCK_AGE}s ago)"
+  LOCK_PID=$(cat "$LOCK" 2>/dev/null)
+  if [[ -n "$LOCK_PID" ]] && kill -0 "$LOCK_PID" 2>/dev/null; then
+    echo "[$(date -u +%H:%M:%S)] SKIP — previous run still active (PID $LOCK_PID)"
     exit 0
   fi
   rm -f "$LOCK"

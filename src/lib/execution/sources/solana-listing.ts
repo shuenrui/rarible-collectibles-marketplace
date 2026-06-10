@@ -9,10 +9,12 @@ import type {
 
 const ME_V2_PROGRAM = "M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K";
 // ME standard auction house — TODO: confirm this matches CC/Phygitals
+// Confirmed from CC purchase tx 3g6r5EmAUM9... (2026-06-10)
 const ME_AUCTION_HOUSE = "E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe";
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const SOLANA_CHAIN_ID = 101;
-const SOL_DECIMALS = 9;
-const LAMPORTS_PER_SOL = 1_000_000_000;
+const USDC_DECIMALS = 6;
+const USDC_ATOMIC_PER_UNIT = 1_000_000;
 
 function platformToSource(sourcePlatform: string): ListingSource {
   if (sourcePlatform === "collector_crypt") return "collector_crypt";
@@ -60,8 +62,8 @@ export class SolanaListingSourceAdapter implements ListingSourceAdapter {
     }
 
     const priceDisplay = listing.priceAmount?.toString() ?? "0";
-    const priceSol = parseFloat(priceDisplay);
-    const priceLamports = BigInt(Math.round(priceSol * LAMPORTS_PER_SOL));
+    const priceUsdc = parseFloat(priceDisplay);
+    const priceLamports = BigInt(Math.round(priceUsdc * USDC_ATOMIC_PER_UNIT));
 
     const payload: MagicEdenV2Payload = {
       rail: "magic_eden_v2",
@@ -88,11 +90,11 @@ export class SolanaListingSourceAdapter implements ListingSourceAdapter {
 
       market: {
         sellerAddress,
-        settlementTokenAddress: undefined,
-        settlementSymbol: "SOL",
+        settlementTokenAddress: USDC_MINT,
+        settlementSymbol: "USDC",
         priceAtomic: priceLamports.toString(),
         priceDisplay: priceDisplay,
-        currencyDecimals: SOL_DECIMALS,
+        currencyDecimals: USDC_DECIMALS,
       },
 
       freshness: {

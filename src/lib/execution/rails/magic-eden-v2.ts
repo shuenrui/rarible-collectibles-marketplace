@@ -28,11 +28,18 @@ const ME_V2_PROGRAM = new PublicKey(
 // Fallback only — getFreshQuote resolves this dynamically from ME's listing API.
 // Shipping real transactions against this address without confirming via a live
 // CC/Phygitals tx hash is unsafe.
+// Confirmed from on-chain tx 3g6r5EmAUM9... (CC purchase, 2026-06-10).
+// requiresSignOff=false on this AH, so the "notary" second signer in CC's
+// txs is CC-app-level — omitting it from our tx should still pass on-chain.
 const ME_AUCTION_HOUSE_FALLBACK = "E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe";
 
-const NATIVE_MINT = new PublicKey(
-  "So11111111111111111111111111111111111111112",
+// CC and Phygitals use USDC (not SOL) as treasury mint — confirmed from CC tx.
+// PDA seeds and escrow account type differ from SOL-based auction houses.
+const USDC_MINT = new PublicKey(
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
 );
+const USDC_DECIMALS = 6;
+
 const ME_PREFIX = Buffer.from("m2");
 const ME_SIGNER_PREFIX = Buffer.from("signer");
 
@@ -114,7 +121,7 @@ function pdaSellerTradeState(
       auctionHouse.toBuffer(),
       seller.toBuffer(),
       programAsSigner.toBuffer(),
-      NATIVE_MINT.toBuffer(),
+      USDC_MINT.toBuffer(),
       mintAddress.toBuffer(),
       tokenAccount.toBuffer(),
       priceBuf,
@@ -140,7 +147,7 @@ function pdaBuyerTradeState(
       auctionHouse.toBuffer(),
       buyer.toBuffer(),
       mintAddress.toBuffer(),
-      NATIVE_MINT.toBuffer(),
+      USDC_MINT.toBuffer(),
       mintAddress.toBuffer(),
       priceBuf,
       sizeBuf,
@@ -165,7 +172,7 @@ function pdaFreeTradeState(
       auctionHouse.toBuffer(),
       seller.toBuffer(),
       tokenAccount.toBuffer(),
-      NATIVE_MINT.toBuffer(),
+      USDC_MINT.toBuffer(),
       mintAddress.toBuffer(),
       zeroBuf,
       sizeBuf,
@@ -195,14 +202,12 @@ async function getAuctionHouseAccounts(
 }
 
 // --- Instruction builders ---
-// Discriminators: first 8 bytes of SHA256("global:<camelCaseInstructionName>") per Anchor IDL convention.
-// IMPORTANT: these byte values must be confirmed against a live decoded ME V2 transaction
-// before any real transaction is submitted. Run `scripts/verify-me-v2-discriminators.ts`
-// once a CC or Phygitals purchase tx hash is available.
+// Discriminators confirmed from decoded CC purchase tx
+// 3g6r5EmAUM9umNJWNSMf4LE7wBpeRRDumvfjNbELuVbgGqWnvtjvciX8DA9aqyWrVstukKVtbVVEutGPsUin6RtV
 const IX = {
-  deposit:      Buffer.from([242,  35, 198, 137,  82, 225, 242, 182]),
-  buy:          Buffer.from([102,   6,  61,  18,   1, 218, 235, 234]),
-  executeSale:  Buffer.from([ 37,  74, 217, 157,  79,  49,  35,   6]),
+  deposit:      Buffer.from([242,  35, 198, 137,  82, 225, 242, 182]), // ✅ confirmed
+  buy:          Buffer.from([184,  23, 238,  97, 103, 197, 211,  61]), // ✅ confirmed
+  executeSale:  Buffer.from([236, 163, 204, 173,  71, 144, 235, 118]), // ✅ confirmed
 } as const;
 
 function ixDeposit(
@@ -240,7 +245,7 @@ function ixBuy(
   const keys: AccountMeta[] = [
     { pubkey: buyer,               isSigner: true,  isWritable: true  },
     { pubkey: sellerTokenAccount,  isSigner: false, isWritable: false },
-    { pubkey: NATIVE_MINT,         isSigner: false, isWritable: false },
+    { pubkey: USDC_MINT,         isSigner: false, isWritable: false },
     { pubkey: mintAddress,         isSigner: false, isWritable: false },
     { pubkey: auctionHouse,        isSigner: false, isWritable: false },
     { pubkey: authority,           isSigner: false, isWritable: false },
@@ -287,7 +292,7 @@ function ixExecuteSale(
     { pubkey: seller,              isSigner: false, isWritable: true  },
     { pubkey: sellerTokenAccount,  isSigner: false, isWritable: true  },
     { pubkey: buyerTokenAccount,   isSigner: false, isWritable: true  },
-    { pubkey: NATIVE_MINT,         isSigner: false, isWritable: false },
+    { pubkey: USDC_MINT,         isSigner: false, isWritable: false },
     { pubkey: mintAddress,         isSigner: false, isWritable: false },
     { pubkey: escrow,              isSigner: false, isWritable: true  },
     { pubkey: auctionHouse,        isSigner: false, isWritable: false },
@@ -325,8 +330,8 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
     if (meListing) {
       resolvedAuctionHouse = meListing.auctionHouse;
       stillActive = true;
-      // Update price from live ME response if it differs from our DB value.
-      const liveLamports = BigInt(Math.round(meListing.price * 1_000_000_000));
+      // Update price from live ME response. CC/Phygitals priced in USDC (6 decimals).
+      const liveLamports = BigInt(Math.round(meListing.price * 1_000_000));
       const updatedPayload: MagicEdenV2Payload = {
         ...payload,
         auctionHouse: resolvedAuctionHouse,
@@ -393,13 +398,27 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
 
     const conn = connection();
     const buyerKey = new PublicKey(buyerWallet);
-    const balance = await conn.getBalance(buyerKey).catch(() => 0);
-    const priceLamports = BigInt(payload.priceLamportsOrAtomic);
-    const needed = priceLamports + 10_000_000n; // 0.01 SOL fee buffer
-    if (BigInt(balance) < needed) {
-      reasons.push(
-        `Insufficient SOL: have ${balance} lamports, need ${needed.toString()}`,
-      );
+
+    // CC/Phygitals are USDC-priced — check buyer's USDC token balance, not SOL.
+    const buyerUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, buyerKey);
+    let usdcBalance = 0n;
+    try {
+      const tokenInfo = await conn.getTokenAccountBalance(buyerUsdcAta);
+      usdcBalance = BigInt(tokenInfo.value.amount);
+    } catch {
+      // ATA doesn't exist → zero balance
+    }
+    const priceAtomic = BigInt(payload.priceLamportsOrAtomic);
+    if (usdcBalance < priceAtomic) {
+      const have = (Number(usdcBalance) / 1_000_000).toFixed(2);
+      const need = (Number(priceAtomic) / 1_000_000).toFixed(2);
+      reasons.push(`Insufficient USDC: have ${have}, need ${need}`);
+    }
+
+    // Also check SOL covers network fees (~0.001 SOL)
+    const solBalance = await conn.getBalance(buyerKey).catch(() => 0);
+    if (solBalance < 1_000_000) {
+      reasons.push(`Insufficient SOL for fees: have ${solBalance} lamports, need ~1000000`);
     }
 
     return {

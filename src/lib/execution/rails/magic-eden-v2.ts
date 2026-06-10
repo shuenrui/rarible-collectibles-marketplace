@@ -22,16 +22,14 @@ import type {
   MagicEdenV2Payload,
 } from "../types";
 
-// ME V2 program and known constants
 const ME_V2_PROGRAM = new PublicKey(
   "M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K",
 );
-// Magic Eden's standard auction house for SOL-denominated listings on mainnet.
-// CC and Phygitals listings go through this house — confirmed from on-chain tx.
-// TODO: verify against actual CC/Phygitals purchase tx once available.
-const ME_AUCTION_HOUSE = new PublicKey(
-  "E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe",
-);
+// Fallback only — getFreshQuote resolves this dynamically from ME's listing API.
+// Shipping real transactions against this address without confirming via a live
+// CC/Phygitals tx hash is unsafe.
+const ME_AUCTION_HOUSE_FALLBACK = "E8cU1WiRWjanGxmn96ewBgk9vPTcL6AEZ1t6F6fkgUWe";
+
 const NATIVE_MINT = new PublicKey(
   "So11111111111111111111111111111111111111112",
 );
@@ -39,35 +37,73 @@ const ME_PREFIX = Buffer.from("m2");
 const ME_SIGNER_PREFIX = Buffer.from("signer");
 
 const SOLANA_RPC =
-  process.env.SOLANA_RPC_URL ||
-  "https://api.mainnet-beta.solana.com";
+  process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+const ME_API = "https://api-mainnet.magiceden.dev/v2";
 
 function connection(): Connection {
   return new Connection(SOLANA_RPC, "confirmed");
 }
 
-async function findProgramAsSigner(): Promise<[PublicKey, number]> {
+// Calls ME's public listing endpoint to get the live price + auction house for a mint.
+// Returns null if the token isn't currently listed on ME (may have sold or been delisted).
+async function resolveMeListing(mintAddress: string): Promise<{
+  auctionHouse: string;
+  price: number;
+  seller: string;
+} | null> {
+  try {
+    const res = await fetch(
+      `${ME_API}/tokens/${mintAddress}/listings`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const listings = await res.json();
+    if (!Array.isArray(listings) || listings.length === 0) return null;
+    const first = listings[0];
+    if (!first.auctionHouse || !first.price || !first.seller) return null;
+    return {
+      auctionHouse: first.auctionHouse as string,
+      price: first.price as number,
+      seller: first.seller as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// --- PDA helpers (all accept auctionHouse as param) ---
+
+function pdaProgramAsSigner(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [ME_PREFIX, ME_SIGNER_PREFIX],
     ME_V2_PROGRAM,
   );
 }
 
-async function findEscrowPaymentAccount(
+function pdaEscrowPaymentAccount(
+  auctionHouse: PublicKey,
   buyer: PublicKey,
-): Promise<[PublicKey, number]> {
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [ME_PREFIX, ME_AUCTION_HOUSE.toBuffer(), buyer.toBuffer()],
+    [ME_PREFIX, auctionHouse.toBuffer(), buyer.toBuffer()],
     ME_V2_PROGRAM,
   );
 }
 
-async function findSellerTradeState(
+function pdaSellerTradeState(
+  auctionHouse: PublicKey,
   seller: PublicKey,
   tokenAccount: PublicKey,
   mintAddress: PublicKey,
   priceLamports: bigint,
-): Promise<[PublicKey, number]> {
+): [PublicKey, number] {
+  const [programAsSigner] = pdaProgramAsSigner();
   const priceBuf = Buffer.allocUnsafe(8);
   priceBuf.writeBigUInt64LE(priceLamports);
   const sizeBuf = Buffer.allocUnsafe(8);
@@ -75,9 +111,9 @@ async function findSellerTradeState(
   return PublicKey.findProgramAddressSync(
     [
       ME_PREFIX,
-      ME_AUCTION_HOUSE.toBuffer(),
+      auctionHouse.toBuffer(),
       seller.toBuffer(),
-      (await findProgramAsSigner())[0].toBuffer(),
+      programAsSigner.toBuffer(),
       NATIVE_MINT.toBuffer(),
       mintAddress.toBuffer(),
       tokenAccount.toBuffer(),
@@ -88,11 +124,12 @@ async function findSellerTradeState(
   );
 }
 
-async function findBuyerTradeState(
+function pdaBuyerTradeState(
+  auctionHouse: PublicKey,
   buyer: PublicKey,
   mintAddress: PublicKey,
   priceLamports: bigint,
-): Promise<[PublicKey, number]> {
+): [PublicKey, number] {
   const priceBuf = Buffer.allocUnsafe(8);
   priceBuf.writeBigUInt64LE(priceLamports);
   const sizeBuf = Buffer.allocUnsafe(8);
@@ -100,7 +137,7 @@ async function findBuyerTradeState(
   return PublicKey.findProgramAddressSync(
     [
       ME_PREFIX,
-      ME_AUCTION_HOUSE.toBuffer(),
+      auctionHouse.toBuffer(),
       buyer.toBuffer(),
       mintAddress.toBuffer(),
       NATIVE_MINT.toBuffer(),
@@ -112,11 +149,12 @@ async function findBuyerTradeState(
   );
 }
 
-async function findFreeTradeState(
+function pdaFreeTradeState(
+  auctionHouse: PublicKey,
   seller: PublicKey,
   tokenAccount: PublicKey,
   mintAddress: PublicKey,
-): Promise<[PublicKey, number]> {
+): [PublicKey, number] {
   const zeroBuf = Buffer.allocUnsafe(8);
   zeroBuf.writeBigUInt64LE(0n);
   const sizeBuf = Buffer.allocUnsafe(8);
@@ -124,7 +162,7 @@ async function findFreeTradeState(
   return PublicKey.findProgramAddressSync(
     [
       ME_PREFIX,
-      ME_AUCTION_HOUSE.toBuffer(),
+      auctionHouse.toBuffer(),
       seller.toBuffer(),
       tokenAccount.toBuffer(),
       NATIVE_MINT.toBuffer(),
@@ -136,100 +174,97 @@ async function findFreeTradeState(
   );
 }
 
-// Reads the ME auction house account to get authority, fee account, and treasury
-async function getAuctionHouseAccounts(conn: Connection): Promise<{
-  authority: PublicKey;
-  feeAccount: PublicKey;
-  treasury: PublicKey;
-}> {
-  const info = await conn.getAccountInfo(ME_AUCTION_HOUSE);
-  if (!info) throw new Error("ME auction house account not found");
-  // Auction House account layout (Metaplex): 8 byte discriminator, then fields
-  // authority: bytes 8-40, fee_payer_bump: 40, treasury_bump: 41,
-  // fee_account: 42-74, treasury: 74-106, ...
-  // This layout is for the standard Metaplex AH — ME V2 may differ slightly.
-  // We read known PDA addresses instead to avoid layout dependency.
+// Reads live auction house account: authority is stored at bytes 8-40 (after discriminator).
+// Fee account and treasury are PDAs derived from the auction house address.
+async function getAuctionHouseAccounts(
+  conn: Connection,
+  auctionHouse: PublicKey,
+): Promise<{ authority: PublicKey; feeAccount: PublicKey; treasury: PublicKey }> {
+  const info = await conn.getAccountInfo(auctionHouse);
+  if (!info) throw new Error(`Auction house account not found: ${auctionHouse.toBase58()}`);
   const [feeAccount] = PublicKey.findProgramAddressSync(
-    [ME_PREFIX, ME_AUCTION_HOUSE.toBuffer(), Buffer.from("fee_payer")],
+    [ME_PREFIX, auctionHouse.toBuffer(), Buffer.from("fee_payer")],
     ME_V2_PROGRAM,
   );
   const [treasury] = PublicKey.findProgramAddressSync(
-    [ME_PREFIX, ME_AUCTION_HOUSE.toBuffer(), Buffer.from("treasury")],
+    [ME_PREFIX, auctionHouse.toBuffer(), Buffer.from("treasury")],
     ME_V2_PROGRAM,
   );
-  // Authority is stored in the account data at offset 8 (after 8-byte discriminator)
   const authority = new PublicKey(info.data.slice(8, 40));
   return { authority, feeAccount, treasury };
 }
 
-// Instruction discriminators for ME V2 (keccak-derived, same as Anchor pattern)
-// These are the first 8 bytes of sha256("global:<instruction_name>") for ME V2.
-// Obtained from ME V2 IDL / known transaction calldata.
-const DEPOSIT_IX = Buffer.from([242, 35, 198, 137, 82, 225, 242, 182]);
-const BUY_IX = Buffer.from([102, 6, 61, 18, 1, 218, 235, 234]);
-const EXECUTE_SALE_IX = Buffer.from([37, 74, 217, 157, 79, 49, 35, 6]);
+// --- Instruction builders ---
+// Discriminators: first 8 bytes of SHA256("global:<camelCaseInstructionName>") per Anchor IDL convention.
+// IMPORTANT: these byte values must be confirmed against a live decoded ME V2 transaction
+// before any real transaction is submitted. Run `scripts/verify-me-v2-discriminators.ts`
+// once a CC or Phygitals purchase tx hash is available.
+const IX = {
+  deposit:      Buffer.from([242,  35, 198, 137,  82, 225, 242, 182]),
+  buy:          Buffer.from([102,   6,  61,  18,   1, 218, 235, 234]),
+  executeSale:  Buffer.from([ 37,  74, 217, 157,  79,  49,  35,   6]),
+} as const;
 
-function buildDepositInstruction(
+function ixDeposit(
   buyer: PublicKey,
+  auctionHouse: PublicKey,
   escrow: PublicKey,
   amount: bigint,
 ): TransactionInstruction {
-  const amountBuf = Buffer.allocUnsafe(8);
-  amountBuf.writeBigUInt64LE(amount);
-  const data = Buffer.concat([DEPOSIT_IX, amountBuf]);
-
+  const data = Buffer.concat([IX.deposit, (() => { const b = Buffer.allocUnsafe(8); b.writeBigUInt64LE(amount); return b; })()]);
   const keys: AccountMeta[] = [
-    { pubkey: buyer, isSigner: true, isWritable: true },
-    { pubkey: ME_AUCTION_HOUSE, isSigner: false, isWritable: false },
-    { pubkey: escrow, isSigner: false, isWritable: true },
+    { pubkey: buyer,               isSigner: true,  isWritable: true  },
+    { pubkey: auctionHouse,        isSigner: false, isWritable: false },
+    { pubkey: escrow,              isSigner: false, isWritable: true  },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_RENT_PUBKEY,  isSigner: false, isWritable: false },
   ];
   return new TransactionInstruction({ keys, programId: ME_V2_PROGRAM, data });
 }
 
-function buildBuyInstruction(
+function ixBuy(
   buyer: PublicKey,
   sellerTokenAccount: PublicKey,
   mintAddress: PublicKey,
+  auctionHouse: PublicKey,
+  authority: PublicKey,
+  feeAccount: PublicKey,
   escrow: PublicKey,
   buyerTradeState: PublicKey,
   buyerTradeStateBump: number,
-  authority: PublicKey,
-  feeAccount: PublicKey,
   priceLamports: bigint,
 ): TransactionInstruction {
-  const priceBuf = Buffer.allocUnsafe(8);
-  priceBuf.writeBigUInt64LE(priceLamports);
-  const sizeBuf = Buffer.allocUnsafe(8);
-  sizeBuf.writeBigUInt64LE(1n);
-  const bumpBuf = Buffer.from([buyerTradeStateBump]);
-  const data = Buffer.concat([BUY_IX, bumpBuf, priceBuf, sizeBuf]);
-
+  const priceBuf = Buffer.allocUnsafe(8); priceBuf.writeBigUInt64LE(priceLamports);
+  const sizeBuf  = Buffer.allocUnsafe(8); sizeBuf.writeBigUInt64LE(1n);
+  const data = Buffer.concat([IX.buy, Buffer.from([buyerTradeStateBump]), priceBuf, sizeBuf]);
   const keys: AccountMeta[] = [
-    { pubkey: buyer, isSigner: true, isWritable: true },
-    { pubkey: sellerTokenAccount, isSigner: false, isWritable: false },
-    { pubkey: NATIVE_MINT, isSigner: false, isWritable: false },
-    { pubkey: mintAddress, isSigner: false, isWritable: false },
-    { pubkey: ME_AUCTION_HOUSE, isSigner: false, isWritable: false },
-    { pubkey: authority, isSigner: false, isWritable: false },
-    { pubkey: feeAccount, isSigner: false, isWritable: true },
-    { pubkey: escrow, isSigner: false, isWritable: true },
-    { pubkey: buyerTradeState, isSigner: false, isWritable: true },
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: buyer,               isSigner: true,  isWritable: true  },
+    { pubkey: sellerTokenAccount,  isSigner: false, isWritable: false },
+    { pubkey: NATIVE_MINT,         isSigner: false, isWritable: false },
+    { pubkey: mintAddress,         isSigner: false, isWritable: false },
+    { pubkey: auctionHouse,        isSigner: false, isWritable: false },
+    { pubkey: authority,           isSigner: false, isWritable: false },
+    { pubkey: feeAccount,          isSigner: false, isWritable: true  },
+    { pubkey: escrow,              isSigner: false, isWritable: true  },
+    { pubkey: buyerTradeState,     isSigner: false, isWritable: true  },
+    { pubkey: TOKEN_PROGRAM_ID,    isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_RENT_PUBKEY,  isSigner: false, isWritable: false },
     { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
   ];
   return new TransactionInstruction({ keys, programId: ME_V2_PROGRAM, data });
 }
 
-function buildExecuteSaleInstruction(
+function ixExecuteSale(
   buyer: PublicKey,
   seller: PublicKey,
   sellerTokenAccount: PublicKey,
   buyerTokenAccount: PublicKey,
   mintAddress: PublicKey,
+  auctionHouse: PublicKey,
+  authority: PublicKey,
+  feeAccount: PublicKey,
+  treasury: PublicKey,
   escrow: PublicKey,
   sellerTradeState: PublicKey,
   buyerTradeState: PublicKey,
@@ -237,45 +272,41 @@ function buildExecuteSaleInstruction(
   freeTradeStateBump: number,
   programAsSigner: PublicKey,
   programAsSignerBump: number,
-  authority: PublicKey,
-  feeAccount: PublicKey,
-  treasury: PublicKey,
   priceLamports: bigint,
 ): TransactionInstruction {
-  const priceBuf = Buffer.allocUnsafe(8);
-  priceBuf.writeBigUInt64LE(priceLamports);
-  const sizeBuf = Buffer.allocUnsafe(8);
-  sizeBuf.writeBigUInt64LE(1n);
+  const priceBuf = Buffer.allocUnsafe(8); priceBuf.writeBigUInt64LE(priceLamports);
+  const sizeBuf  = Buffer.allocUnsafe(8); sizeBuf.writeBigUInt64LE(1n);
   const data = Buffer.concat([
-    EXECUTE_SALE_IX,
+    IX.executeSale,
     Buffer.from([freeTradeStateBump, programAsSignerBump]),
     priceBuf,
     sizeBuf,
   ]);
-
   const keys: AccountMeta[] = [
-    { pubkey: buyer, isSigner: false, isWritable: true },
-    { pubkey: seller, isSigner: false, isWritable: true },
-    { pubkey: sellerTokenAccount, isSigner: false, isWritable: true },
-    { pubkey: buyerTokenAccount, isSigner: false, isWritable: true },
-    { pubkey: NATIVE_MINT, isSigner: false, isWritable: false },
-    { pubkey: mintAddress, isSigner: false, isWritable: false },
-    { pubkey: escrow, isSigner: false, isWritable: true },
-    { pubkey: ME_AUCTION_HOUSE, isSigner: false, isWritable: false },
-    { pubkey: authority, isSigner: false, isWritable: false },
-    { pubkey: feeAccount, isSigner: false, isWritable: true },
-    { pubkey: treasury, isSigner: false, isWritable: true },
-    { pubkey: sellerTradeState, isSigner: false, isWritable: true },
-    { pubkey: buyerTradeState, isSigner: false, isWritable: true },
-    { pubkey: freeTradeState, isSigner: false, isWritable: true },
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: buyer,               isSigner: false, isWritable: true  },
+    { pubkey: seller,              isSigner: false, isWritable: true  },
+    { pubkey: sellerTokenAccount,  isSigner: false, isWritable: true  },
+    { pubkey: buyerTokenAccount,   isSigner: false, isWritable: true  },
+    { pubkey: NATIVE_MINT,         isSigner: false, isWritable: false },
+    { pubkey: mintAddress,         isSigner: false, isWritable: false },
+    { pubkey: escrow,              isSigner: false, isWritable: true  },
+    { pubkey: auctionHouse,        isSigner: false, isWritable: false },
+    { pubkey: authority,           isSigner: false, isWritable: false },
+    { pubkey: feeAccount,          isSigner: false, isWritable: true  },
+    { pubkey: treasury,            isSigner: false, isWritable: true  },
+    { pubkey: sellerTradeState,    isSigner: false, isWritable: true  },
+    { pubkey: buyerTradeState,     isSigner: false, isWritable: true  },
+    { pubkey: freeTradeState,      isSigner: false, isWritable: true  },
+    { pubkey: TOKEN_PROGRAM_ID,    isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: programAsSigner, isSigner: false, isWritable: false },
-    { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+    { pubkey: programAsSigner,     isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_RENT_PUBKEY,  isSigner: false, isWritable: false },
   ];
   return new TransactionInstruction({ keys, programId: ME_V2_PROGRAM, data });
 }
+
+// --- Rail adapter ---
 
 export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
   async getFreshQuote(
@@ -284,16 +315,48 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
   ): Promise<ExecutableListing> {
     const payload = input.execution.payload as MagicEdenV2Payload;
     const conn = connection();
+
+    // 1. Try ME listing API to resolve current auction house + price + confirm still listed.
+    const meListing = await resolveMeListing(payload.mintAddress);
+
+    let resolvedAuctionHouse = payload.auctionHouse;
+    let stillActive = false;
+
+    if (meListing) {
+      resolvedAuctionHouse = meListing.auctionHouse;
+      stillActive = true;
+      // Update price from live ME response if it differs from our DB value.
+      const liveLamports = BigInt(Math.round(meListing.price * 1_000_000_000));
+      const updatedPayload: MagicEdenV2Payload = {
+        ...payload,
+        auctionHouse: resolvedAuctionHouse,
+        buyerAddress: buyerWallet,
+        priceLamportsOrAtomic: liveLamports.toString(),
+        quoteSource: "api",
+      };
+      return {
+        ...input,
+        market: {
+          ...input.market,
+          priceAtomic: liveLamports.toString(),
+          priceDisplay: meListing.price.toString(),
+        },
+        freshness: {
+          quotedAt: new Date().toISOString(),
+          quoteTtlSec: 30,
+          stillActive: true,
+        },
+        execution: { ...input.execution, payload: updatedPayload },
+      };
+    }
+
+    // 2. ME API unavailable or listing not found — fall back to RPC token account check.
+    // This tells us if seller still holds the NFT but can't resolve the auction house.
     const mint = new PublicKey(payload.mintAddress);
     const seller = new PublicKey(payload.sellerAddress);
     const sellerATA = getAssociatedTokenAddressSync(mint, seller);
-
-    // Confirm the seller still holds the NFT (listing still active)
-    const tokenInfo = await conn.getTokenAccountBalance(sellerATA).catch(
-      () => null,
-    );
-    const stillActive =
-      tokenInfo !== null && Number(tokenInfo.value.amount) === 1;
+    const tokenInfo = await conn.getTokenAccountBalance(sellerATA).catch(() => null);
+    stillActive = tokenInfo !== null && Number(tokenInfo.value.amount) === 1;
 
     return {
       ...input,
@@ -301,6 +364,10 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
         quotedAt: new Date().toISOString(),
         quoteTtlSec: 30,
         stillActive,
+      },
+      execution: {
+        ...input.execution,
+        payload: { ...payload, auctionHouse: resolvedAuctionHouse, buyerAddress: buyerWallet },
       },
     };
   }
@@ -310,24 +377,29 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
     buyerWallet: string,
   ): Promise<ExecutableValidation> {
     const payload = input.execution.payload as MagicEdenV2Payload;
-    const conn = connection();
     const reasons: string[] = [];
 
-    // Check buyer has enough SOL
-    const buyerKey = new PublicKey(buyerWallet);
-    const balance = await conn.getBalance(buyerKey);
-    const priceLamports = BigInt(payload.priceLamportsOrAtomic);
-    // Add ~0.01 SOL buffer for rent + fees
-    const needed = priceLamports + 10_000_000n;
-    if (BigInt(balance) < needed) {
+    if (!input.freshness.stillActive) {
+      reasons.push("Listing is no longer active");
+    }
+
+    // Refuse to build a transaction with the fallback auction house — it's unconfirmed.
+    if (payload.auctionHouse === ME_AUCTION_HOUSE_FALLBACK && payload.quoteSource !== "api") {
       reasons.push(
-        `Insufficient SOL balance: have ${balance} lamports, need ${needed.toString()}`,
+        "Auction house address not confirmed from live listing data. " +
+          "Call getFreshQuote first or provide a verified purchase tx hash.",
       );
     }
 
-    // Confirm listing still active
-    if (!input.freshness.stillActive) {
-      reasons.push("Listing is no longer active — seller no longer holds NFT");
+    const conn = connection();
+    const buyerKey = new PublicKey(buyerWallet);
+    const balance = await conn.getBalance(buyerKey).catch(() => 0);
+    const priceLamports = BigInt(payload.priceLamportsOrAtomic);
+    const needed = priceLamports + 10_000_000n; // 0.01 SOL fee buffer
+    if (BigInt(balance) < needed) {
+      reasons.push(
+        `Insufficient SOL: have ${balance} lamports, need ${needed.toString()}`,
+      );
     }
 
     return {
@@ -343,85 +415,43 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
     buyerWallet: string,
   ): Promise<UnsignedExecutionPayload> {
     const payload = input.execution.payload as MagicEdenV2Payload;
-    const conn = connection();
 
+    const auctionHouse = new PublicKey(payload.auctionHouse);
     const buyer = new PublicKey(buyerWallet);
     const seller = new PublicKey(payload.sellerAddress);
     const mint = new PublicKey(payload.mintAddress);
     const priceLamports = BigInt(payload.priceLamportsOrAtomic);
 
     const sellerATA = getAssociatedTokenAddressSync(mint, seller);
-    const buyerATA = getAssociatedTokenAddressSync(mint, buyer);
-    const [escrow] = await findEscrowPaymentAccount(buyer);
-    const [programAsSigner, programAsSignerBump] =
-      await findProgramAsSigner();
-    const [sellerTradeState] = await findSellerTradeState(
-      seller,
-      sellerATA,
-      mint,
-      priceLamports,
-    );
-    const [buyerTradeState, buyerTradeStateBump] = await findBuyerTradeState(
-      buyer,
-      mint,
-      priceLamports,
-    );
-    const [freeTradeState, freeTradeStateBump] = await findFreeTradeState(
-      seller,
-      sellerATA,
-      mint,
-    );
+    const buyerATA  = getAssociatedTokenAddressSync(mint, buyer);
 
-    const { authority, feeAccount, treasury } =
-      await getAuctionHouseAccounts(conn);
+    const [escrow]                         = pdaEscrowPaymentAccount(auctionHouse, buyer);
+    const [programAsSigner, pasBump]       = pdaProgramAsSigner();
+    const [sellerTradeState]               = pdaSellerTradeState(auctionHouse, seller, sellerATA, mint, priceLamports);
+    const [buyerTradeState, btsBump]       = pdaBuyerTradeState(auctionHouse, buyer, mint, priceLamports);
+    const [freeTradeState, ftsBump]        = pdaFreeTradeState(auctionHouse, seller, sellerATA, mint);
 
+    const conn = connection();
+    const { authority, feeAccount, treasury } = await getAuctionHouseAccounts(conn, auctionHouse);
     const { blockhash } = await conn.getLatestBlockhash();
-    const tx = new Transaction({ recentBlockhash: blockhash, feePayer: buyer });
 
+    const tx = new Transaction({ recentBlockhash: blockhash, feePayer: buyer });
     tx.add(
-      buildDepositInstruction(buyer, escrow, priceLamports),
-      buildBuyInstruction(
-        buyer,
-        sellerATA,
-        mint,
-        escrow,
-        buyerTradeState,
-        buyerTradeStateBump,
-        authority,
-        feeAccount,
-        priceLamports,
-      ),
-      buildExecuteSaleInstruction(
-        buyer,
-        seller,
-        sellerATA,
-        buyerATA,
-        mint,
-        escrow,
-        sellerTradeState,
-        buyerTradeState,
-        freeTradeState,
-        freeTradeStateBump,
-        programAsSigner,
-        programAsSignerBump,
-        authority,
-        feeAccount,
-        treasury,
-        priceLamports,
-      ),
+      ixDeposit(buyer, auctionHouse, escrow, priceLamports),
+      ixBuy(buyer, sellerATA, mint, auctionHouse, authority, feeAccount, escrow, buyerTradeState, btsBump, priceLamports),
+      ixExecuteSale(buyer, seller, sellerATA, buyerATA, mint, auctionHouse, authority, feeAccount, treasury, escrow, sellerTradeState, buyerTradeState, freeTradeState, ftsBump, programAsSigner, pasBump, priceLamports),
     );
 
-    const serialized = tx.serialize({ requireAllSignatures: false });
     return {
       chain: "solana",
-      unsignedTransactionBase64: serialized.toString("base64"),
+      unsignedTransactionBase64: tx.serialize({ requireAllSignatures: false }).toString("base64"),
       programIds: [ME_V2_PROGRAM.toBase58()],
     };
   }
 
   async reconcile(
     txHash: string,
-    input: ExecutableListing,
+    _input: ExecutableListing,
   ): Promise<ExecutionResult> {
     const conn = connection();
     try {
@@ -429,12 +459,8 @@ export class MagicEdenV2RailAdapter implements ExecutionRailAdapter {
         commitment: "confirmed",
         maxSupportedTransactionVersion: 0,
       });
-      if (!result) {
-        return { txHash, status: "submitted", sourceListingStatus: "unknown" };
-      }
-      if (result.meta?.err) {
-        return { txHash, status: "failed", sourceListingStatus: "unknown" };
-      }
+      if (!result) return { txHash, status: "submitted", sourceListingStatus: "unknown" };
+      if (result.meta?.err) return { txHash, status: "failed", sourceListingStatus: "unknown" };
       return { txHash, status: "confirmed", sourceListingStatus: "sold" };
     } catch {
       return { txHash, status: "submitted", sourceListingStatus: "unknown" };

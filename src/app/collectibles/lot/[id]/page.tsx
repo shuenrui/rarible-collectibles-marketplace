@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ConnectButton from "@/components/ConnectButton";
-import MakeOfferForm from "@/components/MakeOfferForm";
+import BuyOnRaribleButton from "@/components/BuyOnRaribleButton";
 import LotWishlistButton from "@/components/LotWishlistButton";
+
+const PLATFORM_LABELS: Record<string, string> = {
+  courtyard: "Courtyard",
+  beezie: "Beezie",
+  collector_crypt: "Collector Crypt",
+  phygitals: "Phygitals",
+};
 
 type ListingItem = {
   id: string;
@@ -167,7 +174,7 @@ export default async function LotPage({ params }: LotPageProps) {
   const courtyardEstimate = listing ? await getCourtyardEstimate(listing) : null;
 
   const title = listing?.title ?? "Featured Collectible";
-  const grade = listing?.gradeValue || listing?.gradeNormalized || "UNKNOWN";
+  const grade = listing?.gradeValue || listing?.gradeNormalized || "Ungraded";
   const priceDisplay = listing
     ? formatDisplayPrice(listing.priceUsd, listing.priceAmount, listing.priceCurrency)
     : "$0";
@@ -177,6 +184,7 @@ export default async function LotPage({ params }: LotPageProps) {
     : Number.NaN;
   const hasDealChip = Number.isFinite(askUsd) && Number.isFinite(estUsd);
   const isGoodDeal = hasDealChip ? askUsd < estUsd : false;
+  const sourceLabel = listing ? (PLATFORM_LABELS[listing.sourcePlatform] ?? listing.sourcePlatform) : "Unknown";
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
@@ -195,38 +203,30 @@ export default async function LotPage({ params }: LotPageProps) {
       </header>
 
       <section className="mx-auto grid w-full max-w-[1280px] gap-8 px-4 py-8 md:px-8 lg:grid-cols-[1fr_420px]">
-        <article className="border-2 border-[#FEDB02] bg-[#1A1A1A] p-4">
-          <div className="relative aspect-[3/4] border-2 border-black bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500">
-            {listing?.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={listing.imageUrl}
-                alt={title}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src="https://placehold.co/600x800/png?text=No+Image"
-                alt="No image"
-                className="h-full w-full object-cover"
-              />
-            )}
-            <div className="absolute left-2 top-2 bg-black px-3 py-1 font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]">{grade}</div>
+        <article className="bg-[#111]">
+          <div className="relative aspect-[3/4] bg-neutral-900">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={listing?.imageUrl ?? "https://placehold.co/600x800/png?text=No+Image"}
+              alt={title}
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute left-3 top-3 bg-black/80 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+              {grade}
+            </div>
           </div>
-          <div className="mt-4 flex items-center justify-between">
-            <p className="font-mono text-xs tracking-[0.2em] text-white/60">ITEM ID · {listing?.id ?? params.id}</p>
-            <p className="font-mono text-xs tracking-[0.2em] text-red-400">LIVE · 00:42:18</p>
+          <div className="mt-3 flex items-center justify-between px-1">
+            <p className="text-[11px] text-white/40">Item · {(listing?.id ?? params.id).slice(0, 12)}…</p>
+            <p className="text-[11px] text-white/40">Listed via {sourceLabel}</p>
           </div>
         </article>
 
         <aside className="space-y-5">
           <div className="border-2 border-white/20 bg-[#111] p-5">
-            <p className="font-mono text-[10px] font-bold tracking-[0.2em] text-[#FEDB02]">FEATURED AUCTION</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight">{title}</h1>
-            <p className="mt-2 text-sm text-white/70">
-              {listing?.categoryL1 ?? "collectibles"} · source {listing?.sourcePlatform ?? "aggregator"}
+            <p className="text-[10px] font-semibold text-white/40">
+              {listing?.categoryL1 ?? "Collectible"} · Listed on {sourceLabel}
             </p>
+            <h1 className="mt-2 text-3xl font-black leading-tight">{title}</h1>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <div className="border border-white/20 bg-black/30 p-3">
@@ -257,6 +257,12 @@ export default async function LotPage({ params }: LotPageProps) {
 
             <div className="mt-6 space-y-3">
               <LotWishlistButton listingId={listing?.id ?? params.id} />
+              {listing ? (
+                <BuyOnRaribleButton
+                  listingId={listing.id}
+                  sourcePlatform={listing.sourcePlatform}
+                />
+              ) : null}
               <a
                 href={listing?.sourceUrl ?? "#"}
                 target="_blank"
@@ -277,7 +283,7 @@ export default async function LotPage({ params }: LotPageProps) {
                     <div>
                       <p className="line-clamp-1 text-sm font-bold">{sale.title.slice(0, 25)}</p>
                       <p className="font-mono text-[10px] text-white/45">
-                        {sale.sourcePlatform} · {formatShortDate(sale.soldAt)}
+                        {PLATFORM_LABELS[sale.sourcePlatform] ?? sale.sourcePlatform} · {formatShortDate(sale.soldAt)}
                       </p>
                     </div>
                     <p className="font-mono text-sm font-bold text-[#FEDB02]">{sale.priceDisplay}</p>
@@ -291,15 +297,41 @@ export default async function LotPage({ params }: LotPageProps) {
 
           <div className="border-2 border-white/20 bg-[#111] p-5">
             <h2 className="text-lg font-black">Provenance</h2>
-            <ul className="mt-3 space-y-2 text-sm text-white/75">
-              <li>• Source platform: {listing?.sourcePlatform ?? "unknown"}</li>
-              <li>• Category: {listing?.categoryL1 ?? "unknown"}</li>
-              <li>• Last sync confidence: {listing?.syncConfidence ?? "n/a"}</li>
-              <li>• On-chain / API settlement: recorded</li>
-            </ul>
+            <div className="mt-3 space-y-0">
+              <div className="flex items-start gap-3 border-b border-white/10 py-3">
+                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                <div>
+                  <p className="text-[11px] font-bold text-white">Listed on {sourceLabel}</p>
+                  <p className="mt-0.5 text-[11px] text-white/40">Physical item held in verified vault or custody</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 border-b border-white/10 py-3">
+                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[#FEDB02]" />
+                <div>
+                  <p className="text-[11px] font-bold text-white">Aggregated by Rarible Collectibles</p>
+                  <p className="mt-0.5 text-[11px] text-white/40">
+                    Synced via API · confidence {Math.round((listing?.syncConfidence ?? 0) * 100)}%
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 py-3">
+                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-white/20" />
+                <div>
+                  <p className="text-[11px] font-bold text-white/50">On-chain settlement (after purchase)</p>
+                  <p className="mt-0.5 text-[11px] text-white/30">Transfer recorded on-chain when item changes hands</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <MakeOfferForm listingId={listing?.id ?? params.id} />
+          <div className="border-2 border-white/10 bg-[#0D0D0D] p-5">
+            <h2 className="text-sm font-black text-white/70">How it works</h2>
+            <div className="mt-3 space-y-3 text-[11px] text-white/50">
+              <p><span className="font-bold text-white/70">Physical custody</span> — Your item stays in a vetted vault until you redeem it. Ownership is tracked on-chain.</p>
+              <p><span className="font-bold text-white/70">Buy directly here</span> — Pay via card or crypto. We settle the transaction through smart contract on your behalf.</p>
+              <p><span className="font-bold text-white/70">Redeem anytime</span> — Request physical delivery from your vault dashboard. Shipping fees apply.</p>
+            </div>
+          </div>
 
           <Link
             href="/collectibles"

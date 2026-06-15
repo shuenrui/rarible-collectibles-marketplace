@@ -160,11 +160,11 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2">
             <div className="hidden items-center gap-2 border-2 border-black p-0.5 md:flex">
-              <Link href="/" className="bg-black px-3 py-1 font-mono text-[10px] font-black tracking-[0.2em] text-[#FEDB02]">
-                COLLECTORS
+              <Link href="/" className="bg-black px-3 py-1 text-[10px] font-black text-[#FEDB02]">
+                Browse &amp; collect
               </Link>
-              <Link href="/traders" className="px-3 py-1 font-mono text-[10px] font-bold tracking-[0.2em] text-black/70">
-                TRADERS
+              <Link href="/traders" className="px-3 py-1 text-[10px] font-bold text-black/60">
+                Trade &amp; track
               </Link>
             </div>
             <ConnectButton />
@@ -196,11 +196,11 @@ export default function Home() {
                 Vault
               </Link>
               <div className="mx-4 mt-2 flex items-center gap-2 border-2 border-black p-0.5">
-                <Link href="/" onClick={() => setMobileNavOpen(false)} className="flex-1 bg-black py-2 text-center font-mono text-[10px] font-black tracking-[0.2em] text-[#FEDB02]">
-                  COLLECTORS
+                <Link href="/" onClick={() => setMobileNavOpen(false)} className="flex-1 bg-black py-2 text-center text-[10px] font-black text-[#FEDB02]">
+                  Browse &amp; collect
                 </Link>
-                <Link href="/traders" onClick={() => setMobileNavOpen(false)} className="flex-1 py-2 text-center font-mono text-[10px] font-bold tracking-[0.2em] text-black/70">
-                  TRADERS
+                <Link href="/traders" onClick={() => setMobileNavOpen(false)} className="flex-1 py-2 text-center text-[10px] font-bold text-black/60">
+                  Trade &amp; track
                 </Link>
               </div>
             </div>
@@ -208,57 +208,33 @@ export default function Home() {
         )}
       </header>
 
-      <section className="border-b-[3px] border-[#FEDB02] px-4 py-16 md:px-8 md:py-20">
-        <div className="mx-auto grid w-full max-w-[1280px] gap-10 lg:grid-cols-[1fr_320px]">
+      <section className="border-b border-white/10 px-4 py-8 md:px-8">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-end justify-between gap-6">
           <div>
-            <div className="mb-5 inline-block bg-[#FEDB02] px-4 py-2 font-mono text-xs font-bold tracking-[0.2em] text-black">
-              RARIBLE COLLECTIBLES
-            </div>
-            <h1 className="text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
-              Every graded card and
-              <br />
-              physical collectible,
+            <h1 className="text-3xl font-black leading-tight tracking-tight md:text-5xl">
+              Every graded card &amp; collectible,
               <br />
               <span className="text-[#FEDB02]">one price source.</span>
             </h1>
-            <p className="mt-5 max-w-md text-base text-white/60">
-              Browse and buy from Courtyard, Collector Crypt, Beezie, and Phygitals — all in one place, with price comparisons and provenance built in.
+            <p className="mt-3 max-w-xl text-sm text-white/50">
+              Buy from Courtyard, Collector Crypt, Beezie, and Phygitals — all in one place, with price comparisons and provenance.
             </p>
-            {featured && (
-              <div className="mt-6 flex flex-wrap items-end gap-4 border-l-2 border-[#FEDB02] pl-4">
-                <p className="text-3xl font-black md:text-4xl">{featuredPrice}</p>
-                <p className="font-mono text-xs tracking-widest text-white/60">
-                  {featuredLoading ? "LOADING" : `${featuredSource} · ${featuredGrade}`}
-                </p>
-              </div>
-            )}
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/collectibles"
-                className="border-2 border-[#FEDB02] bg-[#FEDB02] px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-black"
-              >
-                Browse Marketplace
-              </Link>
-              {featured && (
-                <Link
-                  href={`/collectibles/lot/${featured.id}`}
-                  className="border-2 border-white/30 px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-white/80"
-                >
-                  View Featured Lot
-                </Link>
-              )}
-            </div>
           </div>
-
-          <div className="border-2 border-[#FEDB02] bg-[#1A1A1A] p-4">
-            <div className="aspect-[3/4] w-full border-2 border-black bg-gradient-to-br from-yellow-300 via-orange-400 to-red-500">
-              {featured?.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={featured.imageUrl} alt={featured.title} className="h-full w-full object-cover" />
-              ) : null}
-            </div>
-            <p className="mt-3 line-clamp-2 text-sm font-bold">{featured?.title || "Featured collectible"}</p>
-            <p className="mt-1 font-mono text-xs text-[#FEDB02]">FEATURED LISTING · {featuredSource}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/collectibles"
+              className="border-2 border-[#FEDB02] bg-[#FEDB02] px-5 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-black"
+            >
+              Browse Marketplace
+            </Link>
+            {featured && (
+              <Link
+                href={`/collectibles/lot/${featured.id}`}
+                className="border-2 border-white/20 px-5 py-2.5 text-sm font-bold text-white/70"
+              >
+                Featured lot · {featuredPrice}
+              </Link>
+            )}
           </div>
         </div>
       </section>

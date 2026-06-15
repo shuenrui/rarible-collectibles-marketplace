@@ -297,7 +297,7 @@ export default function CollectiblesPage() {
               </div>
               <button
                 type="submit"
-                className="border-2 border-black bg-black px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]"
+                className="border-2 border-black bg-black px-4 py-2 text-[11px] font-semibold text-white/50"
               >
                 Search
               </button>
@@ -442,7 +442,7 @@ export default function CollectiblesPage() {
           <div className="mt-3 space-y-4 pb-2">
             {/* Mobile price filter */}
             <div>
-              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Price (USD)</p>
+              <p className="mb-2 text-[11px] font-semibold text-white/50">Price (USD)</p>
               <form onSubmit={applyPriceFilter} className="flex items-center gap-2">
                 <input
                   type="number"
@@ -476,7 +476,7 @@ export default function CollectiblesPage() {
             {/* Mobile grade filter */}
             {grades.length > 0 && (
               <div>
-                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Grade</p>
+                <p className="mb-2 text-[11px] font-semibold text-white/50">Grade</p>
                 <div className="flex flex-wrap gap-1">
                   <button
                     onClick={clearGradeFilter}
@@ -500,7 +500,7 @@ export default function CollectiblesPage() {
             {/* Mobile source filter */}
             {platforms.length > 1 && (
               <div>
-                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Source</p>
+                <p className="mb-2 text-[11px] font-semibold text-white/50">Source</p>
                 <div className="flex flex-wrap gap-1">
                   <button
                     onClick={clearPlatformFilter}
@@ -527,17 +527,17 @@ export default function CollectiblesPage() {
       <section className="mx-auto flex w-full max-w-[1480px]">
         <aside className="hidden w-[220px] shrink-0 border-r-2 border-white/10 bg-[#0A0A0A] p-5 lg:block">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-black">FILTERS</h2>
+            <h2 className="text-sm font-bold text-white/80">Filters</h2>
             <button
               onClick={() => { setActiveCategory("all"); clearSearch(); clearPriceFilter(); clearGradeFilter(); clearPlatformFilter(); }}
-              className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]"
+              className="text-[11px] font-semibold text-[#FEDB02]"
             >
-              CLEAR
+              Clear all
             </button>
           </div>
 
           {/* Price range filter */}
-          <p className="mb-2 mt-0 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Price (USD)</p>
+          <p className="mb-2 mt-0 text-[11px] font-semibold text-white/50">Price (USD)</p>
           <form onSubmit={applyPriceFilter} className="space-y-2">
             <div className="flex items-center gap-1">
               <input
@@ -582,7 +582,7 @@ export default function CollectiblesPage() {
             )}
           </form>
 
-          <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Category</p>
+          <p className="mb-2 mt-6 text-[11px] font-semibold text-white/50">Category</p>
           <div className="space-y-2">
             {categories.map((cat) => (
               <button
@@ -599,7 +599,7 @@ export default function CollectiblesPage() {
           {/* Platform filter */}
           {platforms.length > 1 && (
             <>
-              <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Source</p>
+              <p className="mb-2 mt-6 text-[11px] font-semibold text-white/50">Source</p>
               <div className="space-y-2">
                 <button
                   onClick={clearPlatformFilter}
@@ -623,7 +623,7 @@ export default function CollectiblesPage() {
             </>
           )}
 
-          <p className="mb-2 mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Grade</p>
+          <p className="mb-2 mt-6 text-[11px] font-semibold text-white/50">Grade</p>
           <div className="space-y-2">
             <button
               onClick={clearGradeFilter}
@@ -769,24 +769,31 @@ export default function CollectiblesPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {loading
               ? Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="overflow-hidden border-2 border-white/10 bg-black/30">
-                    <div className="aspect-[3/4] animate-pulse bg-gradient-to-br from-neutral-800 to-neutral-700" />
-                    <div className="space-y-2 p-2">
-                      <div className="h-3 w-3/4 animate-pulse bg-neutral-700" />
-                      <div className="h-3 w-1/2 animate-pulse bg-neutral-800" />
+                  <div key={i} className="overflow-hidden bg-white">
+                    <div className="aspect-[3/4] animate-pulse bg-neutral-200" />
+                    <div className="space-y-2 p-3">
+                      <div className="h-5 w-1/2 animate-pulse bg-neutral-200" />
+                      <div className="h-3 w-3/4 animate-pulse bg-neutral-100" />
+                      <div className="h-3 w-1/3 animate-pulse bg-neutral-100" />
                     </div>
                   </div>
                 ))
               : items.map((item) => {
                   const itemTimestamp = item.listedAt ?? item.syncedAt;
                   const isNew = Date.now() - new Date(itemTimestamp).getTime() < 48 * 60 * 60 * 1000;
+                  const grade = activeTab === "packs" ? "Sealed" : (item.gradeValue || item.gradeNormalized || "—");
+                  const price = item.priceUsd
+                    ? `$${Number(item.priceUsd).toLocaleString()}`
+                    : `${item.priceAmount} ${item.priceCurrency}`;
+                  const source = PLATFORM_LABELS[item.sourcePlatform] ?? item.sourcePlatform;
                   return (
-                  <article key={item.id} className="overflow-hidden border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] transition hover:-translate-y-0.5 hover:shadow-[0_8px_0_#FEDB02]">
-                    <Link href={`/collectibles/lot/${item.id}`}>
-                      <div className="relative aspect-[3/4] border-b-2 border-[#0A0A0A] bg-gradient-to-br from-yellow-300 via-yellow-400 to-orange-500">
+                  <article key={item.id} className="group overflow-hidden bg-white text-[#0A0A0A] transition hover:shadow-[0_6px_0_#FEDB02]">
+                    <Link href={`/collectibles/lot/${item.id}`} className="block">
+                      {/* 1 — Image */}
+                      <div className="relative aspect-[3/4] bg-neutral-100">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={item.imageUrl}
@@ -796,17 +803,16 @@ export default function CollectiblesPage() {
                             (e.currentTarget as HTMLImageElement).src = "https://placehold.co/600x800/png?text=No+Image";
                           }}
                         />
-                        <div className="absolute left-1 top-1 bg-[#0A0A0A] px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#FEDB02]">
-                          {activeTab === "packs" ? "SEALED" : (item.gradeValue || item.gradeNormalized || "UNKNOWN")}
+                        {/* 2 — Grade badge */}
+                        <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                          {grade}
                         </div>
-                        {/* NEW badge for recently listed items */}
                         {isNew && (
-                          <div className="absolute bottom-1 left-1 bg-orange-500 px-1.5 py-0.5 font-mono text-[8px] font-black tracking-wider text-white">
-                            NEW
+                          <div className="absolute bottom-2 left-2 bg-[#FEDB02] px-1.5 py-0.5 text-[9px] font-black text-black">
+                            New
                           </div>
                         )}
-                        {/* Wishlist heart — top right */}
-                        <div className="absolute right-1 top-1 bg-[#0A0A0A]/70">
+                        <div className="absolute right-1 top-1">
                           <WishlistButton
                             listingId={item.id}
                             isWishlisted={wishlistedIds.has(item.id)}
@@ -814,27 +820,31 @@ export default function CollectiblesPage() {
                           />
                         </div>
                       </div>
-                      <div className="p-2">
-                        <h3 className="line-clamp-2 min-h-[30px] text-xs font-bold leading-tight">{item.title}</h3>
-                        <div className="mt-2 flex items-end justify-between">
-                          <p className="text-base font-black">
-                            {item.priceUsd ? `$${Number(item.priceUsd).toLocaleString()}` : `${item.priceAmount} ${item.priceCurrency}`}
-                          </p>
-                          <div className="flex flex-col items-end gap-0.5">
-                            <span className="font-mono text-[9px] text-[#6B6B6B]">{item.sourcePlatform}</span>
-                            <span className="font-mono text-[8px] text-white/30">{timeAgo(item.listedAt ?? item.syncedAt)}</span>
-                          </div>
+                      <div className="p-3">
+                        {/* 3 — Price (loud) */}
+                        <p className="text-xl font-black leading-none">{price}</p>
+                        {/* Title (secondary) */}
+                        <h3 className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-tight text-neutral-500">
+                          {item.title}
+                        </h3>
+                        {/* 4 — Source (quiet trust-mark) */}
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-neutral-400">
+                            {source}
+                          </span>
+                          <span className="font-mono text-[9px] text-neutral-300">{timeAgo(item.listedAt ?? item.syncedAt)}</span>
                         </div>
                       </div>
                     </Link>
-                    <div className="px-2 pb-2">
+                    {/* 5 — CTA (secondary, fills on hover) */}
+                    <div className="px-3 pb-3">
                       <a
                         href={item.sourceUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="block w-full bg-[#0A0A0A] py-2 text-center font-mono text-[10px] font-bold tracking-[0.2em] text-[#FEDB02]"
+                        className="block w-full border border-[#0A0A0A] py-2 text-center text-[10px] font-bold tracking-wide text-[#0A0A0A] transition-colors group-hover:bg-[#0A0A0A] group-hover:text-[#FEDB02]"
                       >
-                        BUY NOW
+                        Buy Now
                       </a>
                     </div>
                   </article>

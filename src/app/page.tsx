@@ -310,16 +310,22 @@ export default function Home() {
                     : `${item.priceAmount} ${item.priceCurrency}`;
 
                   return (
-                    <Link key={item.id} href={`/collectibles/lot/${item.id}`} className="border-2 border-black bg-white p-3">
-                      <div className="aspect-[3/4] border-2 border-black bg-gradient-to-br from-yellow-200 via-yellow-400 to-orange-500">
-                        {item.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
-                        ) : null}
+                    <Link key={item.id} href={`/collectibles/lot/${item.id}`} className="group overflow-hidden border-2 border-black bg-white transition hover:shadow-[0_4px_0_#FEDB02]">
+                      <div className="relative aspect-[3/4] bg-neutral-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.imageUrl || "https://placehold.co/300x400/png?text=No+Image"}
+                          alt={item.title}
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                          {grade}
+                        </div>
                       </div>
-                      <p className="mt-3 line-clamp-2 text-sm font-black leading-tight">{item.title}</p>
-                      <p className="mt-1 font-mono text-xs">{grade}</p>
-                      <p className="mt-2 text-xl font-black">{price}</p>
+                      <div className="p-3">
+                        <p className="text-xl font-black leading-none text-black">{price}</p>
+                        <p className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-tight text-neutral-500">{item.title}</p>
+                      </div>
                     </Link>
                   );
                 })}

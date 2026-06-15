@@ -230,7 +230,7 @@ export default async function LotPage({ params }: LotPageProps) {
 
             <div className="mt-6 grid grid-cols-2 gap-3">
               <div className="border border-white/20 bg-black/30 p-3">
-                <p className="font-mono text-[10px] text-white/50">CURRENT BID</p>
+                <p className="font-mono text-[10px] text-white/50">ASKING PRICE</p>
                 <p className="mt-1 text-3xl font-black">{priceDisplay}</p>
               </div>
               <div className="border border-white/20 bg-black/30 p-3">
@@ -267,9 +267,9 @@ export default async function LotPage({ params }: LotPageProps) {
                 href={listing?.sourceUrl ?? "#"}
                 target="_blank"
                 rel="noreferrer"
-                className="block w-full border-2 border-white/25 bg-transparent py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.2em] text-white"
+                className="block w-full border-2 border-white/25 bg-transparent py-3 text-center text-xs font-bold text-white/60 hover:text-white"
               >
-                OPEN SOURCE LISTING
+                View on {sourceLabel} ↗
               </a>
             </div>
           </div>

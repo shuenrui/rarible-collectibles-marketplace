@@ -39,18 +39,18 @@ const fandoms = [
     image: "/banners/pokemon.jpg",
   },
   {
+    name: "Sports Cards",
+    slug: "sports_cards",
+    count: "2,951",
+    tag: "Baseball · NBA · More",
+    image: "/banners/baseball.jpg",
+  },
+  {
     name: "Marvel",
     slug: "comics",
     count: "612",
     tag: "Multiverse Arc",
     image: "/banners/marvel.jpg",
-  },
-  {
-    name: "Baseball",
-    slug: "sports_cards",
-    count: "2,104",
-    tag: "Hall of Flame",
-    image: "/banners/baseball.jpg",
   },
   {
     name: "Yu-Gi-Oh",
@@ -60,24 +60,25 @@ const fandoms = [
     image: "/banners/yugioh.jpg",
   },
   {
-    name: "NBA",
-    slug: "sports_cards",
-    count: "847",
-    tag: "GOAT Vault",
-    image: "/banners/nba.jpg",
-  },
-  {
     name: "One Piece",
     slug: "one_piece",
     count: "389",
     tag: "Grand Line",
     image: "/banners/onepiece.jpg",
   },
+  {
+    name: "All Collectibles",
+    slug: "",
+    count: "23,000+",
+    tag: "Every category",
+    image: "/banners/pokemon.jpg",
+  },
 ];
 
 export default function Home() {
   const [packOpen, setPackOpen] = useState(false);
   const [sellOpen, setSellOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [featured, setFeatured] = useState<FeaturedItem | null>(null);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [hotItems, setHotItems] = useState<HotItem[]>([]);
@@ -158,7 +159,7 @@ export default function Home() {
             </Link>
           </nav>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 border-2 border-black p-0.5">
+            <div className="hidden items-center gap-2 border-2 border-black p-0.5 md:flex">
               <Link href="/" className="bg-black px-3 py-1 font-mono text-[10px] font-black tracking-[0.2em] text-[#FEDB02]">
                 COLLECTORS
               </Link>
@@ -167,48 +168,85 @@ export default function Home() {
               </Link>
             </div>
             <ConnectButton />
+            {/* Hamburger — mobile only */}
+            <button
+              className="flex flex-col justify-center gap-[5px] p-2 md:hidden"
+              onClick={() => setMobileNavOpen((v) => !v)}
+              aria-label="Open menu"
+            >
+              <span className={`block h-[2px] w-5 bg-black transition-all ${mobileNavOpen ? "translate-y-[7px] rotate-45" : ""}`} />
+              <span className={`block h-[2px] w-5 bg-black transition-all ${mobileNavOpen ? "opacity-0" : ""}`} />
+              <span className={`block h-[2px] w-5 bg-black transition-all ${mobileNavOpen ? "-translate-y-[7px] -rotate-45" : ""}`} />
+            </button>
           </div>
         </div>
+        {/* Mobile menu */}
+        {mobileNavOpen && (
+          <div className="border-t-2 border-black md:hidden">
+            <div className="flex flex-col py-2">
+              <Link href="/collectibles" onClick={() => setMobileNavOpen(false)} className="px-4 py-3 text-sm font-bold text-black">
+                Marketplace
+              </Link>
+              <span className="px-4 py-3 text-sm font-bold text-black/50">Drops</span>
+              <span className="px-4 py-3 text-sm font-bold text-black/50">Packs</span>
+              <button onClick={() => { setSellOpen(true); setMobileNavOpen(false); }} className="px-4 py-3 text-left text-sm font-bold text-black/70">
+                Sell
+              </button>
+              <Link href="/vault" onClick={() => setMobileNavOpen(false)} className="px-4 py-3 text-sm font-bold text-black/70">
+                Vault
+              </Link>
+              <div className="mx-4 mt-2 flex items-center gap-2 border-2 border-black p-0.5">
+                <Link href="/" onClick={() => setMobileNavOpen(false)} className="flex-1 bg-black py-2 text-center font-mono text-[10px] font-black tracking-[0.2em] text-[#FEDB02]">
+                  COLLECTORS
+                </Link>
+                <Link href="/traders" onClick={() => setMobileNavOpen(false)} className="flex-1 py-2 text-center font-mono text-[10px] font-bold tracking-[0.2em] text-black/70">
+                  TRADERS
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <section className="border-b-[3px] border-[#FEDB02] px-4 py-16 md:px-8 md:py-20">
         <div className="mx-auto grid w-full max-w-[1280px] gap-10 lg:grid-cols-[1fr_320px]">
           <div>
             <div className="mb-5 inline-block bg-[#FEDB02] px-4 py-2 font-mono text-xs font-bold tracking-[0.2em] text-black">
-              {featuredGrade}
+              RARIBLE COLLECTIBLES
             </div>
-            <h1 className="text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
-              BID ON
+            <h1 className="text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
+              Every graded card and
               <br />
-              SOMETHING
+              physical collectible,
               <br />
-              <span className="text-[#FEDB02]">LEGENDARY.</span>
+              <span className="text-[#FEDB02]">one price source.</span>
             </h1>
-            <div className="mt-8 flex flex-wrap items-end gap-5">
-              <p className="text-5xl font-black md:text-7xl">{featuredPrice}</p>
-              <p className="font-mono text-xs tracking-widest text-white/60">
-                {featuredLoading ? "LOADING FEATURED LISTING" : `${featuredSource} · TOP LISTING`}
-              </p>
-            </div>
+            <p className="mt-5 max-w-md text-base text-white/60">
+              Browse and buy from Courtyard, Collector Crypt, Beezie, and Phygitals — all in one place, with price comparisons and provenance built in.
+            </p>
+            {featured && (
+              <div className="mt-6 flex flex-wrap items-end gap-4 border-l-2 border-[#FEDB02] pl-4">
+                <p className="text-3xl font-black md:text-4xl">{featuredPrice}</p>
+                <p className="font-mono text-xs tracking-widest text-white/60">
+                  {featuredLoading ? "LOADING" : `${featuredSource} · ${featuredGrade}`}
+                </p>
+              </div>
+            )}
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href={featured ? `/collectibles/lot/${featured.id}` : "/collectibles"}
-                className="border-2 border-[#FEDB02] bg-[#FEDB02] px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-black"
-              >
-                View Lot
-              </Link>
-              <Link
                 href="/collectibles"
-                className="border-2 border-white/40 px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-white"
+                className="border-2 border-[#FEDB02] bg-[#FEDB02] px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-black"
               >
                 Browse Marketplace
               </Link>
-              <button
-                onClick={() => setPackOpen(true)}
-                className="border-2 border-[#FEDB02] bg-transparent px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-[#FEDB02]"
-              >
-                Rip My Pack
-              </button>
+              {featured && (
+                <Link
+                  href={`/collectibles/lot/${featured.id}`}
+                  className="border-2 border-white/30 px-6 py-3 text-sm font-bold uppercase tracking-[0.14em] text-white/80"
+                >
+                  View Featured Lot
+                </Link>
+              )}
             </div>
           </div>
 
@@ -242,7 +280,7 @@ export default function Home() {
             {fandoms.map((fandom) => (
               <Link
                 key={fandom.name}
-                href={`/collection/${fandom.slug}`}
+                href={fandom.slug ? `/collection/${fandom.slug}` : "/collectibles"}
                 className="group relative overflow-hidden border-2 border-black bg-black"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

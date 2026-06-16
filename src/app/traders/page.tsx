@@ -64,11 +64,11 @@ export default function TradersPage() {
             </Link>
           </div>
           <div className="flex items-center gap-2 border-2 border-black p-0.5">
-            <Link href="/" className="px-3 py-1 font-mono text-[10px] font-bold tracking-[0.2em] text-black/70">
-              COLLECTORS
+            <Link href="/" className="px-3 py-1 text-[10px] font-bold text-black/60">
+              Browse &amp; collect
             </Link>
-            <Link href="/traders" className="bg-black px-3 py-1 font-mono text-[10px] font-black tracking-[0.2em] text-[#FEDB02]">
-              TRADERS
+            <Link href="/traders" className="bg-black px-3 py-1 text-[10px] font-black text-[#FEDB02]">
+              Trade &amp; track
             </Link>
           </div>
         </div>

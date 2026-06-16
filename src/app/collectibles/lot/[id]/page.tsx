@@ -131,14 +131,26 @@ async function getCourtyardEstimate(listing: ListingItem): Promise<CourtyardEsti
   }
 }
 
+// Exclude NFT/crypto contamination from physical card comp results
+const CONTAMINATION_EXCLUDE = ["moonbird", "nft", "pfp", "pixel", "ape", "bayc", "azuki", "pudgy"];
+
+function buildCompWhere(listing: ListingItem, status: "sold" | "active") {
+  return {
+    listingStatus: status,
+    categoryL1: listing.categoryL1 as never,
+    ...(status === "sold" && listing.gradeNormalized
+      ? { gradeNormalized: listing.gradeNormalized as never }
+      : {}),
+    id: { not: listing.id },
+    AND: CONTAMINATION_EXCLUDE.map((kw) => ({
+      title: { not: { contains: kw, mode: "insensitive" as const } },
+    })),
+  };
+}
+
 async function getRecentSales(listing: ListingItem): Promise<RecentSaleItem[]> {
   const soldRows = await prisma.collectibleListing.findMany({
-    where: {
-      listingStatus: "sold",
-      categoryL1: listing.categoryL1 as never,
-      gradeNormalized: listing.gradeNormalized ? (listing.gradeNormalized as never) : undefined,
-      id: { not: listing.id },
-    },
+    where: buildCompWhere(listing, "sold"),
     orderBy: [{ soldAt: "desc" }, { lastPriceUpdateAt: "desc" }],
     take: 3,
   });
@@ -146,11 +158,7 @@ async function getRecentSales(listing: ListingItem): Promise<RecentSaleItem[]> {
   const rows = soldRows.length
     ? soldRows
     : await prisma.collectibleListing.findMany({
-        where: {
-          listingStatus: "active",
-          categoryL1: listing.categoryL1 as never,
-          id: { not: listing.id },
-        },
+        where: buildCompWhere(listing, "active"),
         orderBy: [{ priceUsd: "asc" }, { lastPriceUpdateAt: "desc" }],
         take: 3,
       });

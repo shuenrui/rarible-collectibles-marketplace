@@ -14,6 +14,13 @@ type CollectionPageProps = {
   };
 };
 
+const PLATFORM_LABELS: Record<string, string> = {
+  courtyard: "Courtyard",
+  beezie: "Beezie",
+  collector_crypt: "Collector Crypt",
+  phygitals: "Phygitals",
+};
+
 const CATEGORY_LABELS: Record<string, string> = {
   pokemon: "Pokemon",
   sports_cards: "Sports Cards",
@@ -178,17 +185,17 @@ export default async function CollectionPage({ params, searchParams }: Collectio
         <aside className="hidden w-[240px] shrink-0 border-r-2 border-white/10 bg-[#0A0A0A] p-5 lg:block">
           <form method="GET" className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-black">FILTERS</h2>
+              <h2 className="text-base font-black">Filters</h2>
               <Link
                 href={`/collection/${slug}`}
-                className="font-mono text-[10px] font-bold tracking-widest text-[#FEDB02]"
+                className="text-[11px] font-semibold text-white/40 hover:text-white"
               >
-                CLEAR
+                Clear all
               </Link>
             </div>
 
             <div>
-              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Grade</p>
+              <p className="mb-2 text-[11px] font-semibold text-white/50">Grade</p>
               <div className="space-y-2">
                 {grades.map((grade) => {
                   if (!grade.gradeNormalized) return null;
@@ -211,7 +218,7 @@ export default async function CollectionPage({ params, searchParams }: Collectio
             </div>
 
             <div>
-              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Source</p>
+              <p className="mb-2 text-[11px] font-semibold text-white/50">Source</p>
               <div className="space-y-2">
                 {platforms.map((platform) => (
                   <label key={platform.sourcePlatform} className="flex items-center justify-between border-b border-white/5 py-1 text-sm">
@@ -222,7 +229,7 @@ export default async function CollectionPage({ params, searchParams }: Collectio
                         value={platform.sourcePlatform}
                         defaultChecked={selectedSource === platform.sourcePlatform}
                       />
-                      <span>{platform.sourcePlatform}</span>
+                      <span>{PLATFORM_LABELS[platform.sourcePlatform] ?? platform.sourcePlatform}</span>
                     </div>
                     <span className="font-mono text-[10px] text-white/35">{platform._count._all}</span>
                   </label>
@@ -231,7 +238,7 @@ export default async function CollectionPage({ params, searchParams }: Collectio
             </div>
 
             <div>
-              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Price USD</p>
+              <p className="mb-2 text-[11px] font-semibold text-white/50">Price USD</p>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   name="min_price_usd"
@@ -249,7 +256,7 @@ export default async function CollectionPage({ params, searchParams }: Collectio
             </div>
 
             <div>
-              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Sort</p>
+              <p className="mb-2 text-[11px] font-semibold text-white/50">Sort</p>
               <select
                 name="sort"
                 defaultValue={sort}
@@ -293,42 +300,46 @@ export default async function CollectionPage({ params, searchParams }: Collectio
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {items.map((item) => (
-              <article key={item.id} className="overflow-hidden border-2 border-[#0A0A0A] bg-white text-[#0A0A0A] transition hover:-translate-y-0.5 hover:shadow-[0_8px_0_#FEDB02]">
-                <Link href={`/collectibles/lot/${item.id}`}>
-                  <div className="relative aspect-[3/4] border-b-2 border-[#0A0A0A] bg-gradient-to-br from-yellow-300 via-yellow-400 to-orange-500">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
-                    <div className="absolute left-1 top-1 bg-[#0A0A0A] px-2 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#FEDB02]">
-                      {item.gradeValue || item.gradeNormalized || "UNKNOWN"}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {items.map((item) => {
+              const grade = item.gradeValue || item.gradeNormalized || "—";
+              const price = item.priceUsd
+                ? `$${Number(item.priceUsd).toLocaleString()}`
+                : `${item.priceAmount.toString()} ${item.priceCurrency}`;
+              const sourceLabel = PLATFORM_LABELS[item.sourcePlatform] ?? item.sourcePlatform;
+
+              return (
+                <article key={item.id} className="group overflow-hidden bg-white text-[#0A0A0A] transition hover:shadow-[0_6px_0_#FEDB02]">
+                  <Link href={`/collectibles/lot/${item.id}`} className="block">
+                    <div className="relative aspect-[3/4] bg-neutral-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                      <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                        {grade}
+                      </div>
                     </div>
+                    <div className="p-3">
+                      <p className="text-xl font-black leading-none">{price}</p>
+                      <h3 className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-tight text-neutral-500">{item.title}</h3>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-neutral-400">{sourceLabel}</span>
+                        <span className="font-mono text-[9px] text-neutral-300">{timeAgo(item.listedAt ?? item.syncedAt)}</span>
+                      </div>
+                    </div>
+                  </Link>
+                  <div className="px-3 pb-3">
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block w-full border border-[#0A0A0A] py-2 text-center text-[10px] font-bold tracking-wide text-[#0A0A0A] transition-colors group-hover:bg-[#0A0A0A] group-hover:text-[#FEDB02]"
+                    >
+                      Buy Now
+                    </a>
                   </div>
-                  <div className="p-2">
-                    <h3 className="line-clamp-2 min-h-[30px] text-xs font-bold leading-tight">{item.title}</h3>
-                    <div className="mt-2 flex items-end justify-between gap-2">
-                      <p className="text-base font-black">
-                        {item.priceUsd ? `$${Number(item.priceUsd).toLocaleString()}` : `${item.priceAmount.toString()} ${item.priceCurrency}`}
-                      </p>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="font-mono text-[9px] text-[#6B6B6B]">{item.sourcePlatform}</span>
-                      <span className="font-mono text-[8px] text-[#6B6B6B]">{timeAgo(item.listedAt ?? item.syncedAt)}</span>
-                    </div>
-                  </div>
-                </Link>
-                <div className="px-2 pb-2">
-                  <a
-                    href={item.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block w-full bg-[#0A0A0A] py-2 text-center font-mono text-[10px] font-bold tracking-[0.2em] text-[#FEDB02]"
-                  >
-                    BUY NOW
-                  </a>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
             {items.length === 0 ? (
               <div className="col-span-full border border-white/20 bg-black/30 p-6 text-sm text-white/70">
                 No active listings currently available for this category with the current filters.

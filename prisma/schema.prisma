@@ -164,6 +164,13 @@ model CollectibleListing {
   syncedAt         DateTime        @default(now())
 
   @@unique([sourcePlatform, sourceListingId])
+  @@index([listingStatus, syncedAt])
+  @@index([listingStatus, listedAt])
+  @@index([listingStatus, priceUsd])
+  @@index([listingStatus, categoryL1, priceUsd])
+  @@index([listingStatus, categoryL1, gradeNormalized, priceUsd])
+  @@index([listingStatus, soldAt])
+  @@index([listingStatus, sourcePlatform])
   @@index([categoryL1, gradeNormalized, priceUsd, listingStatus])
   @@index([chainId, contractAddress, tokenId])
 }

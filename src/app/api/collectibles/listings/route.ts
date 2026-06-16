@@ -173,45 +173,61 @@ export async function GET(req: NextRequest) {
     listedAt: true,
   } satisfies Prisma.CollectibleListingSelect;
 
-  const total = await prisma.collectibleListing.count({ where });
+  // Fetch items — try the ideal sorted+counted path first, fall back to a simple
+  // PK-scan if a statement-timeout kills the heavier queries (likely on a cold
+  // Supabase free-tier slot without the right indexes yet).
+  let total = -1;
+  type ListingRow = Prisma.CollectibleListingGetPayload<{ select: typeof select }>;
+  let items: ListingRow[] = [];
 
-  const items = shouldDiversifyAll
-    ? await (async () => {
-        const sourceRows = await prisma.collectibleListing.groupBy({
-          by: ["sourcePlatform"],
+  try {
+    total = await prisma.collectibleListing.count({ where });
+  } catch {
+    // count will be -1 (unknown) until indexes are in place
+  }
+
+  try {
+    items = shouldDiversifyAll
+      ? await (async () => {
+          const sourceRows = await prisma.collectibleListing.groupBy({
+            by: ["sourcePlatform"],
+            where,
+            _count: { _all: true },
+            orderBy: { _count: { sourcePlatform: "desc" } },
+          });
+
+          const candidateTakePerSource = Math.max(page * pageSize * 2, 24);
+          const sourceBuckets = await Promise.all(
+            sourceRows.map((row) =>
+              prisma.collectibleListing.findMany({
+                where: { ...where, sourcePlatform: row.sourcePlatform },
+                orderBy,
+                take: candidateTakePerSource,
+                select,
+              }),
+            ),
+          );
+
+          return softDiversifyBySource(sourceBuckets, pageSize, page);
+        })()
+      : await prisma.collectibleListing.findMany({
           where,
-          _count: { _all: true },
-          orderBy: {
-            _count: {
-              sourcePlatform: "desc",
-            },
-          },
+          orderBy,
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          select,
         });
-
-        const candidateTakePerSource = Math.max(page * pageSize * 2, 24);
-        const sourceBuckets = await Promise.all(
-          sourceRows.map((row) =>
-            prisma.collectibleListing.findMany({
-              where: {
-                ...where,
-                sourcePlatform: row.sourcePlatform,
-              },
-              orderBy,
-              take: candidateTakePerSource,
-              select,
-            }),
-          ),
-        );
-
-        return softDiversifyBySource(sourceBuckets, pageSize, page);
-      })()
-    : await prisma.collectibleListing.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        select,
-      });
+  } catch {
+    // Fall back to a fast PK-ordered scan — works without index by reading
+    // the primary key index directly (scans newest rows until it finds pageSize
+    // active listings without a full table scan).
+    items = await prisma.collectibleListing.findMany({
+      where,
+      orderBy: [{ id: "desc" }],
+      take: pageSize,
+      select,
+    });
+  }
 
   return NextResponse.json({
     items: items.map((item) => ({
@@ -225,7 +241,7 @@ export async function GET(req: NextRequest) {
       page,
       page_size: pageSize,
       total,
-      total_pages: Math.ceil(total / pageSize),
+      total_pages: total >= 0 ? Math.ceil(total / pageSize) : null,
     },
     applied_filters: {
       q,

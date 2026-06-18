@@ -218,15 +218,19 @@ export async function GET(req: NextRequest) {
           select,
         });
   } catch {
-    // Fall back to a fast PK-ordered scan — works without index by reading
-    // the primary key index directly (scans newest rows until it finds pageSize
-    // active listings without a full table scan).
-    items = await prisma.collectibleListing.findMany({
-      where,
+    // Fall back to a pure PK scan with NO WHERE clause — reads the last
+    // (pageSize * 5) rows from the PK B-tree index only, then filters in
+    // memory. Without a WHERE, Postgres reads exactly N rows without any
+    // heap filter pass, so this cannot hit a statement timeout regardless
+    // of missing indexes.
+    const raw = await prisma.collectibleListing.findMany({
       orderBy: [{ id: "desc" }],
-      take: pageSize,
+      take: pageSize * 5,
       select,
     });
+    items = raw
+      .filter((r) => r.listingStatus === status)
+      .slice(0, pageSize);
   }
 
   return NextResponse.json({

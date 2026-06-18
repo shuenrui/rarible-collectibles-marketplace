@@ -5,6 +5,7 @@ import {
   SolanaListingSourceAdapter,
   MagicEdenV2RailAdapter,
 } from "@/lib/execution";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +25,17 @@ export async function POST(req: NextRequest) {
       buyerWallet,
     );
     const result = await railAdapter.reconcile(txHash, listing);
+
+    if (result.status === "confirmed" && result.sourceListingStatus === "sold") {
+      await prisma.collectibleListing.update({
+        where: { id: listingId },
+        data: {
+          listingStatus: "sold",
+          soldAt: new Date(),
+          syncedAt: new Date(),
+        },
+      });
+    }
 
     return NextResponse.json(result);
   } catch (err) {

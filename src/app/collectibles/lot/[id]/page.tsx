@@ -77,11 +77,12 @@ async function getListing(id: string): Promise<ListingItem | null> {
     where: { id },
   });
 
+  // Only fetch the fallback when the exact ID wasn't found; use PK-desc
+  // with no WHERE so Postgres reads exactly 1 row from the index.
   const row =
     exact ??
     (await prisma.collectibleListing.findFirst({
-      where: { listingStatus: "active" },
-      orderBy: { syncedAt: "desc" },
+      orderBy: { id: "desc" },
     }));
 
   if (!row) return null;
@@ -142,38 +143,41 @@ function buildCompWhere(listing: ListingItem, status: "sold" | "active") {
       ? { gradeNormalized: listing.gradeNormalized as never }
       : {}),
     id: { not: listing.id },
-    AND: CONTAMINATION_EXCLUDE.map((kw) => ({
-      title: { not: { contains: kw, mode: "insensitive" as const } },
+    NOT: CONTAMINATION_EXCLUDE.map((kw) => ({
+      title: { contains: kw, mode: "insensitive" as const },
     })),
   };
 }
 
 async function getRecentSales(listing: ListingItem): Promise<RecentSaleItem[]> {
-  const soldRows = await prisma.collectibleListing.findMany({
-    where: buildCompWhere(listing, "sold"),
-    orderBy: [{ soldAt: "desc" }, { lastPriceUpdateAt: "desc" }],
-    take: 3,
-  });
+  try {
+    const soldRows = await prisma.collectibleListing.findMany({
+      where: buildCompWhere(listing, "sold"),
+      orderBy: [{ soldAt: "desc" }, { lastPriceUpdateAt: "desc" }],
+      take: 3,
+    });
+    const rows = soldRows.length
+      ? soldRows
+      : await prisma.collectibleListing.findMany({
+          where: buildCompWhere(listing, "active"),
+          orderBy: [{ priceUsd: "asc" }, { lastPriceUpdateAt: "desc" }],
+          take: 3,
+        });
 
-  const rows = soldRows.length
-    ? soldRows
-    : await prisma.collectibleListing.findMany({
-        where: buildCompWhere(listing, "active"),
-        orderBy: [{ priceUsd: "asc" }, { lastPriceUpdateAt: "desc" }],
-        take: 3,
-      });
-
-  return rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
-    priceDisplay: formatDisplayPrice(
-      row.priceUsd ? String(row.priceUsd) : null,
-      String(row.priceAmount),
-      row.priceCurrency,
-    ),
-    sourcePlatform: row.sourcePlatform,
-  }));
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
+      priceDisplay: formatDisplayPrice(
+        row.priceUsd ? String(row.priceUsd) : null,
+        String(row.priceAmount),
+        row.priceCurrency,
+      ),
+      sourcePlatform: row.sourcePlatform,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function LotPage({ params }: LotPageProps) {

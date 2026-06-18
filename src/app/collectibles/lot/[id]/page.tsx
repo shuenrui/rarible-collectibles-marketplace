@@ -299,7 +299,23 @@ export default async function LotPage({ params }: LotPageProps) {
               </div>
             </div>
 
-            <div className="mt-6 space-y-3">
+            {/* Source trust mark — shown before CTA so high-ticket buyers see who holds the item */}
+            <div className="mt-6 flex items-center gap-2 rounded border border-white/10 bg-white/5 px-3 py-2">
+              <span className="text-[10px] text-emerald-400">✓</span>
+              <p className="text-[11px] text-white/60">
+                Listed on{" "}
+                <span className="font-bold text-white/80">{sourceLabel}</span>
+                {" · "}
+                Physical item in verified vault
+                {" · "}
+                Sync confidence{" "}
+                <span className="font-bold text-white/80">
+                  {Math.round((listing?.syncConfidence ?? 0) * 100)}%
+                </span>
+              </p>
+            </div>
+
+            <div className="mt-3 space-y-3">
               <LotWishlistButton listingId={listing?.id ?? params.id} />
               {listing ? (
                 <BuyOnRaribleButton

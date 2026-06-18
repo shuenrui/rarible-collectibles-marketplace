@@ -648,7 +648,11 @@ export default function CollectiblesPage() {
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h1 className="text-3xl font-black tracking-tight">
-                {searchQuery ? `"${searchQuery}"` : "TRADING CARDS"}
+                {searchQuery
+                  ? `"${searchQuery}"`
+                  : activeCategory !== "all"
+                  ? (IP_CATEGORIES[activeCategory]?.label ?? "Collectibles")
+                  : "Graded Collectibles"}
               </h1>
               <p className="mt-1 font-mono text-[11px] text-white/45">
                 {loading ? "Loading..." : `${items.length} of ${totalItems.toLocaleString()} listings shown`}

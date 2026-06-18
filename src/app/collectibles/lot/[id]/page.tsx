@@ -191,11 +191,36 @@ export default async function LotPage({ params }: LotPageProps) {
     ? formatDisplayPrice(listing.priceUsd, listing.priceAmount, listing.priceCurrency)
     : "$0";
   const askUsd = listing?.priceUsd ? Number(listing.priceUsd) : Number.NaN;
-  const estUsd = courtyardEstimate?.estimatedValueUsd
+
+  // Courtyard listings get official market estimate from Algolia
+  // Other sources derive estimate from median of recent comparable sales
+  let estUsd = courtyardEstimate?.estimatedValueUsd
     ? Number(courtyardEstimate.estimatedValueUsd)
     : Number.NaN;
+
+  if (!Number.isFinite(estUsd) && recentSales.length >= 2) {
+    const salePrices = recentSales
+      .map((s) => {
+        const m = s.priceDisplay.match(/\$([\d,]+)/);
+        return m ? Number(m[1].replace(/,/g, "")) : Number.NaN;
+      })
+      .filter((n) => Number.isFinite(n) && n > 0);
+
+    if (salePrices.length >= 2) {
+      salePrices.sort((a, b) => a - b);
+      const mid = Math.floor(salePrices.length / 2);
+      estUsd =
+        salePrices.length % 2 === 0
+          ? (salePrices[mid - 1] + salePrices[mid]) / 2
+          : salePrices[mid];
+    }
+  }
+
   const hasDealChip = Number.isFinite(askUsd) && Number.isFinite(estUsd);
   const isGoodDeal = hasDealChip ? askUsd < estUsd : false;
+  const dealScoreDisplay =
+    courtyardEstimate?.dealScore ??
+    (hasDealChip ? (isGoodDeal ? "Below median" : "Above median") : "N/A");
   const sourceLabel = listing ? (PLATFORM_LABELS[listing.sourcePlatform] ?? listing.sourcePlatform) : "Unknown";
 
   return (
@@ -247,14 +272,21 @@ export default async function LotPage({ params }: LotPageProps) {
               </div>
               <div className="border border-white/20 bg-black/30 p-3">
                 <p className="font-mono text-[10px] text-white/50">DEAL SCORE</p>
-                <p className="mt-1 text-3xl font-black">{courtyardEstimate?.dealScore ?? "N/A"}</p>
+                <p className="mt-1 text-3xl font-black">{dealScoreDisplay}</p>
               </div>
             </div>
 
             <div className="mt-3 grid grid-cols-1 gap-3">
               <div className="border border-white/20 bg-black/30 p-3">
-                <p className="font-mono text-[10px] text-white/50">MARKET ESTIMATE</p>
-                <p className="mt-1 text-2xl font-black">{formatMoney(courtyardEstimate?.estimatedValueUsd ?? null)}</p>
+                <p className="font-mono text-[10px] text-white/50">
+                  MARKET ESTIMATE
+                  {!courtyardEstimate && Number.isFinite(estUsd) ? (
+                    <span className="ml-1 text-white/30">(from recent sales)</span>
+                  ) : null}
+                </p>
+                <p className="mt-1 text-2xl font-black">
+                  {Number.isFinite(estUsd) ? formatMoney(String(estUsd)) : "N/A"}
+                </p>
                 {hasDealChip ? (
                   <span
                     className={`mt-2 inline-flex px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.15em] ${

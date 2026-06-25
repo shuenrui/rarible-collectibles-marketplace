@@ -85,6 +85,12 @@ export default function TradersPage() {
       </div>
 
       <section className="border-b-[3px] border-[#FEDB02] px-4 py-3 md:px-8">
+        <div className="mx-auto mb-4 max-w-[1480px] border border-[#FEDB02]/40 bg-[#201800] px-4 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Demo trading console</p>
+          <p className="mt-1 text-sm text-white/70">
+            This page is placeholder market UI. Account balances, bids, P&amp;L, and sales tape are not live user data yet.
+          </p>
+        </div>
         <div className="mx-auto grid w-full max-w-[1480px] gap-2 md:grid-cols-6">
           {[
             { l: "Portfolio", v: "$48,240", d: "+$1,240" },

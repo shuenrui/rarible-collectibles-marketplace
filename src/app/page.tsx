@@ -149,13 +149,11 @@ export default function Home() {
             <Link href="/collectibles" className="px-3 py-2 text-sm font-bold text-black">
               Marketplace
             </Link>
-            <span className="px-3 py-2 text-sm font-bold text-black/70">Drops</span>
-            <span className="px-3 py-2 text-sm font-bold text-black/70">Packs</span>
             <button onClick={() => setSellOpen(true)} className="px-3 py-2 text-sm font-bold text-black/70">
               Sell
             </button>
             <Link href="/vault" className="px-3 py-2 text-sm font-bold text-black/70">
-              Vault
+              Vault Demo
             </Link>
           </nav>
           <div className="flex items-center gap-2">
@@ -164,7 +162,7 @@ export default function Home() {
                 Browse &amp; collect
               </Link>
               <Link href="/traders" className="px-3 py-1 text-[10px] font-bold text-black/60">
-                Trade &amp; track
+                Trade &amp; track demo
               </Link>
             </div>
             <ConnectButton />
@@ -187,20 +185,18 @@ export default function Home() {
               <Link href="/collectibles" onClick={() => setMobileNavOpen(false)} className="px-4 py-3 text-sm font-bold text-black">
                 Marketplace
               </Link>
-              <span className="px-4 py-3 text-sm font-bold text-black/50">Drops</span>
-              <span className="px-4 py-3 text-sm font-bold text-black/50">Packs</span>
               <button onClick={() => { setSellOpen(true); setMobileNavOpen(false); }} className="px-4 py-3 text-left text-sm font-bold text-black/70">
                 Sell
               </button>
               <Link href="/vault" onClick={() => setMobileNavOpen(false)} className="px-4 py-3 text-sm font-bold text-black/70">
-                Vault
+                Vault Demo
               </Link>
               <div className="mx-4 mt-2 flex items-center gap-2 border-2 border-black p-0.5">
                 <Link href="/" onClick={() => setMobileNavOpen(false)} className="flex-1 bg-black py-2 text-center text-[10px] font-black text-[#FEDB02]">
                   Browse &amp; collect
                 </Link>
                 <Link href="/traders" onClick={() => setMobileNavOpen(false)} className="flex-1 py-2 text-center text-[10px] font-bold text-black/60">
-                  Trade &amp; track
+                  Trade &amp; track demo
                 </Link>
               </div>
             </div>

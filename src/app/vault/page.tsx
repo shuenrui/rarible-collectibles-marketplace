@@ -35,6 +35,12 @@ export default function VaultPage() {
       </header>
 
       <section className="border-b-[3px] border-[#FEDB02] bg-[#0A0A0A] px-4 py-6 md:px-8">
+        <div className="mx-auto mb-4 max-w-[1480px] border border-[#FEDB02]/40 bg-[#201800] px-4 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FEDB02]">Demo portfolio</p>
+          <p className="mt-1 text-sm text-white/70">
+            Vault data below is placeholder UI. Connect/login and live account inventory are not wired here yet.
+          </p>
+        </div>
         <div className="mx-auto grid w-full max-w-[1480px] gap-2 md:grid-cols-3">
           <div className="border border-white/15 bg-black/30 p-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">Portfolio Value</p>

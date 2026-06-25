@@ -11,9 +11,18 @@ const PLATFORM_LABELS: Record<string, string> = {
   phygitals: "Phygitals",
 };
 
+const LISTING_TYPE_LABELS = {
+  fixed_price: "Buy now",
+  auction: "Auction",
+  offer: "Offer",
+} as const;
+
 type ListingItem = {
   id: string;
   title: string;
+  franchise: string | null;
+  setName: string | null;
+  cardNumber: string | null;
   imageUrl: string;
   gradeValue: string | null;
   gradeNormalized: string | null;
@@ -21,6 +30,7 @@ type ListingItem = {
   priceCurrency: string;
   priceUsd: string | null;
   sourcePlatform: string;
+  listingType: "fixed_price" | "auction" | "offer";
   sourceUrl: string;
   sourceItemId: string | null;
   categoryL1: string;
@@ -33,6 +43,11 @@ type RecentSaleItem = {
   soldAt: string | null;
   priceDisplay: string;
   sourcePlatform: string;
+};
+
+type RecentSalesResult = {
+  items: RecentSaleItem[];
+  matchType: "exact" | "similar" | "none";
 };
 
 type CourtyardEstimate = {
@@ -72,6 +87,13 @@ function formatShortDate(iso: string | null): string {
   return d.toLocaleDateString();
 }
 
+function getConfidenceMeta(raw: number | null | undefined) {
+  const clamped = Math.max(0, Math.min(100, Math.round(raw ?? 0)));
+  if (clamped >= 85) return { percent: clamped, label: "High", tone: "text-emerald-300" };
+  if (clamped >= 60) return { percent: clamped, label: "Medium", tone: "text-[#FEDB02]" };
+  return { percent: clamped, label: "Low", tone: "text-red-300" };
+}
+
 async function getListing(id: string): Promise<ListingItem | null> {
   const exact = await prisma.collectibleListing.findUnique({
     where: { id },
@@ -90,6 +112,9 @@ async function getListing(id: string): Promise<ListingItem | null> {
   return {
     id: row.id,
     title: row.title,
+    franchise: row.franchise,
+    setName: row.setName,
+    cardNumber: row.cardNumber,
     imageUrl: row.imageUrl,
     gradeValue: row.gradeValue,
     gradeNormalized: row.gradeNormalized,
@@ -97,6 +122,7 @@ async function getListing(id: string): Promise<ListingItem | null> {
     priceCurrency: row.priceCurrency,
     priceUsd: row.priceUsd ? String(row.priceUsd) : null,
     sourcePlatform: row.sourcePlatform,
+    listingType: row.listingType,
     sourceUrl: row.sourceUrl,
     sourceItemId: row.sourceItemId,
     categoryL1: row.categoryL1,
@@ -149,40 +175,90 @@ function buildCompWhere(listing: ListingItem, status: "sold" | "active") {
   };
 }
 
-async function getRecentSales(listing: ListingItem): Promise<RecentSaleItem[]> {
+function buildExactCompWhere(listing: ListingItem) {
+  const exactWhere = {
+    listingStatus: "sold" as const,
+    categoryL1: listing.categoryL1 as never,
+    id: { not: listing.id },
+    ...(listing.gradeNormalized
+      ? { gradeNormalized: listing.gradeNormalized as never }
+      : {}),
+    ...(listing.cardNumber ? { cardNumber: listing.cardNumber } : {}),
+    ...(listing.setName ? { setName: listing.setName } : {}),
+    ...(listing.franchise ? { franchise: listing.franchise } : {}),
+    title: listing.title,
+    NOT: CONTAMINATION_EXCLUDE.map((kw) => ({
+      title: { contains: kw, mode: "insensitive" as const },
+    })),
+  };
+
+  return exactWhere;
+}
+
+function mapRecentSales(rows: Array<{
+  id: string;
+  title: string;
+  soldAt: Date | null;
+  lastPriceUpdateAt: Date;
+  priceUsd: { toString(): string } | null;
+  priceAmount: { toString(): string };
+  priceCurrency: string;
+  sourcePlatform: string;
+}>): RecentSaleItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
+    priceDisplay: formatDisplayPrice(
+      row.priceUsd ? String(row.priceUsd) : null,
+      String(row.priceAmount),
+      row.priceCurrency,
+    ),
+    sourcePlatform: row.sourcePlatform,
+  }));
+}
+
+async function getRecentSales(listing: ListingItem): Promise<RecentSalesResult> {
   try {
+    const exactRows = await prisma.collectibleListing.findMany({
+      where: buildExactCompWhere(listing),
+      orderBy: [{ soldAt: "desc" }, { lastPriceUpdateAt: "desc" }],
+      take: 3,
+    });
+
+    if (exactRows.length) {
+      return { items: mapRecentSales(exactRows), matchType: "exact" };
+    }
+
     const soldRows = await prisma.collectibleListing.findMany({
       where: buildCompWhere(listing, "sold"),
       orderBy: [{ soldAt: "desc" }, { lastPriceUpdateAt: "desc" }],
       take: 3,
     });
-    const rows = soldRows.length
-      ? soldRows
-      : await prisma.collectibleListing.findMany({
+
+    if (soldRows.length) {
+      return { items: mapRecentSales(soldRows), matchType: "similar" };
+    }
+
+    const activeRows = await prisma.collectibleListing.findMany({
           where: buildCompWhere(listing, "active"),
           orderBy: [{ priceUsd: "asc" }, { lastPriceUpdateAt: "desc" }],
           take: 3,
         });
 
-    return rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
-      priceDisplay: formatDisplayPrice(
-        row.priceUsd ? String(row.priceUsd) : null,
-        String(row.priceAmount),
-        row.priceCurrency,
-      ),
-      sourcePlatform: row.sourcePlatform,
-    }));
+    return {
+      items: mapRecentSales(activeRows),
+      matchType: activeRows.length ? "similar" : "none",
+    };
   } catch {
-    return [];
+    return { items: [], matchType: "none" };
   }
 }
 
 export default async function LotPage({ params }: LotPageProps) {
   const listing = await getListing(params.id);
-  const recentSales = listing ? await getRecentSales(listing) : [];
+  const recentSalesResult = listing ? await getRecentSales(listing) : { items: [], matchType: "none" as const };
+  const recentSales = recentSalesResult.items;
   const courtyardEstimate = listing ? await getCourtyardEstimate(listing) : null;
 
   const title = listing?.title ?? "Featured Collectible";
@@ -222,6 +298,10 @@ export default async function LotPage({ params }: LotPageProps) {
     courtyardEstimate?.dealScore ??
     (hasDealChip ? (isGoodDeal ? "Below median" : "Above median") : "N/A");
   const sourceLabel = listing ? (PLATFORM_LABELS[listing.sourcePlatform] ?? listing.sourcePlatform) : "Unknown";
+  const listingTypeLabel = listing ? LISTING_TYPE_LABELS[listing.listingType] : "Listing";
+  const confidence = getConfidenceMeta(listing?.syncConfidence);
+  const recentSalesHeading =
+    recentSalesResult.matchType === "exact" ? "Recent Sales" : "Similar Market Activity";
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-white">
@@ -260,8 +340,8 @@ export default async function LotPage({ params }: LotPageProps) {
 
         <aside className="space-y-5">
           <div className="border-2 border-white/20 bg-[#111] p-5">
-            <p className="text-[10px] font-semibold text-white/40">
-              {listing?.categoryL1 ?? "Collectible"} · Listed on {sourceLabel}
+              <p className="text-[10px] font-semibold text-white/40">
+              {listing?.categoryL1 ?? "Collectible"} · {listingTypeLabel} · Listed on {sourceLabel}
             </p>
             <h1 className="mt-2 text-3xl font-black leading-tight">{title}</h1>
 
@@ -309,8 +389,8 @@ export default async function LotPage({ params }: LotPageProps) {
                 Physical item in verified vault
                 {" · "}
                 Sync confidence{" "}
-                <span className="font-bold text-white/80">
-                  {Math.round((listing?.syncConfidence ?? 0) * 100)}%
+                <span className={`font-bold ${confidence.tone}`}>
+                  {confidence.label} ({confidence.percent}%)
                 </span>
               </p>
             </div>
@@ -335,7 +415,14 @@ export default async function LotPage({ params }: LotPageProps) {
           </div>
 
           <div className="border-2 border-white/20 bg-[#111] p-5">
-            <h2 className="text-lg font-black">Recent Sales</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-black">{recentSalesHeading}</h2>
+              {recentSalesResult.matchType === "similar" ? (
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+                  same category / grade
+                </span>
+              ) : null}
+            </div>
             <div className="mt-3 space-y-2">
               {recentSales.length ? (
                 recentSales.map((sale) => (
@@ -350,7 +437,7 @@ export default async function LotPage({ params }: LotPageProps) {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-white/70">No comparable sales yet for this category/grade.</p>
+                <p className="text-sm text-white/70">No exact or comparable sales yet for this category/grade.</p>
               )}
             </div>
           </div>
@@ -370,7 +457,7 @@ export default async function LotPage({ params }: LotPageProps) {
                 <div>
                   <p className="text-[11px] font-bold text-white">Aggregated by Rarible Collectibles</p>
                   <p className="mt-0.5 text-[11px] text-white/40">
-                    Synced via API · confidence {Math.round((listing?.syncConfidence ?? 0) * 100)}%
+                    Synced via API · confidence {confidence.label.toLowerCase()} ({confidence.percent}%)
                   </p>
                 </div>
               </div>

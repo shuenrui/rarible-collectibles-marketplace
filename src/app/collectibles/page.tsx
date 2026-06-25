@@ -16,6 +16,7 @@ type ListingItem = {
   priceCurrency: string;
   priceUsd: string | null;
   sourcePlatform: string;
+  listingType: "fixed_price" | "auction" | "offer";
   sourceUrl: string;
   categoryL1: string;
   syncConfidence: number;
@@ -45,6 +46,18 @@ const PLATFORM_LABELS: Record<string, string> = {
   collector_crypt: "Collector Crypt",
   phygitals: "Phygitals",
 };
+
+const LISTING_TYPE_LABELS: Record<ListingItem["listingType"], string> = {
+  fixed_price: "Buy now",
+  auction: "Auction",
+  offer: "Offer",
+};
+
+function getPrimaryCtaLabel(listingType: ListingItem["listingType"]): string {
+  if (listingType === "auction") return "Place Bid";
+  if (listingType === "offer") return "View Offer";
+  return "Buy Now";
+}
 
 const PAGE_SIZE = 36;
 
@@ -793,6 +806,7 @@ export default function CollectiblesPage() {
                     ? `$${Number(item.priceUsd).toLocaleString()}`
                     : `${item.priceAmount} ${item.priceCurrency}`;
                   const source = PLATFORM_LABELS[item.sourcePlatform] ?? item.sourcePlatform;
+                  const listingTypeLabel = LISTING_TYPE_LABELS[item.listingType] ?? "Listing";
                   return (
                   <article key={item.id} className="group overflow-hidden bg-white text-[#0A0A0A] transition hover:shadow-[0_6px_0_#FEDB02]">
                     <Link href={`/collectibles/lot/${item.id}`} className="block">
@@ -810,6 +824,9 @@ export default function CollectiblesPage() {
                         {/* 2 — Grade badge */}
                         <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                           {grade}
+                        </div>
+                        <div className="absolute right-2 bottom-2 bg-white/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-black">
+                          {listingTypeLabel}
                         </div>
                         {isNew && (
                           <div className="absolute bottom-2 left-2 bg-[#FEDB02] px-1.5 py-0.5 text-[9px] font-black text-black">
@@ -848,7 +865,7 @@ export default function CollectiblesPage() {
                         rel="noreferrer"
                         className="block w-full border border-[#0A0A0A] py-2 text-center text-[10px] font-bold tracking-wide text-[#0A0A0A] transition-colors group-hover:bg-[#0A0A0A] group-hover:text-[#FEDB02]"
                       >
-                        Buy Now
+                        {getPrimaryCtaLabel(item.listingType)}
                       </a>
                     </div>
                   </article>

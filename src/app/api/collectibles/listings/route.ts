@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
   const categories = asCsv(sp.get("category"));
   const grades = asCsv(sp.get("grade"));
   const platforms = asCsv(sp.get("source_platform"));
+  const listingTypes = asCsv(sp.get("listing_type"));
   const status = sp.get("listing_status") || "active";
   const sort = sp.get("sort") || "newest";
   const minPrice = sp.get("min_price_usd");
@@ -128,6 +129,13 @@ export async function GET(req: NextRequest) {
   if (categories.length) where.categoryL1 = { in: categories as never[] };
   if (grades.length) where.gradeNormalized = { in: grades as never[] };
   if (platforms.length) where.sourcePlatform = { in: platforms as never[] };
+  if (listingTypes.length) where.listingType = { in: listingTypes as never[] };
+
+  if (!listingTypes.length && (sort === "price_asc" || sort === "price_desc")) {
+    // "Lowest price" and "Highest price" should rank actual buy-now inventory,
+    // not auction placeholder bids or offer-only rows.
+    where.listingType = "fixed_price";
+  }
 
   if (minPrice || maxPrice) {
     where.priceUsd = {
@@ -163,6 +171,7 @@ export async function GET(req: NextRequest) {
     priceCurrency: true,
     priceUsd: true,
     sourcePlatform: true,
+    listingType: true,
     sourceUrl: true,
     listingStatus: true,
     categoryL1: true,
@@ -255,6 +264,7 @@ export async function GET(req: NextRequest) {
       min_price_usd: minPrice,
       max_price_usd: maxPrice,
       listing_status: status,
+      listing_types: listingTypes,
       sort,
     },
   });

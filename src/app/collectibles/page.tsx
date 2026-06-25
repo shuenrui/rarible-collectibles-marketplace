@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import ConnectButton from "@/components/ConnectButton";
 import WishlistButton from "@/components/WishlistButton";
+import { formatListingPrice } from "@/lib/pricing";
 
 type ListingItem = {
   id: string;
@@ -802,9 +803,12 @@ export default function CollectiblesPage() {
                   const itemTimestamp = item.listedAt ?? item.syncedAt;
                   const isNew = Date.now() - new Date(itemTimestamp).getTime() < 48 * 60 * 60 * 1000;
                   const grade = activeTab === "packs" ? "Sealed" : (item.gradeValue || item.gradeNormalized || "—");
-                  const price = item.priceUsd
-                    ? `$${Number(item.priceUsd).toLocaleString()}`
-                    : `${item.priceAmount} ${item.priceCurrency}`;
+                  const price = formatListingPrice(
+                    item.priceUsd,
+                    item.priceAmount,
+                    item.priceCurrency,
+                    item.listingType,
+                  );
                   const source = PLATFORM_LABELS[item.sourcePlatform] ?? item.sourcePlatform;
                   const listingTypeLabel = LISTING_TYPE_LABELS[item.listingType] ?? "Listing";
                   return (

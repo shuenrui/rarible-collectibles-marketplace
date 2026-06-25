@@ -17,6 +17,7 @@ export async function GET() {
       priceAmount: true,
       priceCurrency: true,
       priceUsd: true,
+      listingType: true,
       sourcePlatform: true,
       gradeValue: true,
       gradeNormalized: true,

@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
           priceAmount: true,
           priceCurrency: true,
           priceUsd: true,
+          listingType: true,
           sourcePlatform: true,
           sourceUrl: true,
         },

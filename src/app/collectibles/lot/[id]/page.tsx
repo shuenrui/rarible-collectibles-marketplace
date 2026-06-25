@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import ConnectButton from "@/components/ConnectButton";
 import BuyOnRaribleButton from "@/components/BuyOnRaribleButton";
 import LotWishlistButton from "@/components/LotWishlistButton";
+import { formatListingPrice, formatUsdString } from "@/lib/pricing";
 
 const PLATFORM_LABELS: Record<string, string> = {
   courtyard: "Courtyard",
@@ -60,19 +61,16 @@ type LotPageProps = {
 };
 
 function formatMoney(value: string | null): string {
-  if (!value) return "N/A";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return value;
-  return `$${num.toLocaleString()}`;
+  return formatUsdString(value, 2) ?? "N/A";
 }
 
 function formatDisplayPrice(
   priceUsd: string | null,
   priceAmount: string,
   priceCurrency: string,
+  listingType?: ListingItem["listingType"],
 ): string {
-  if (priceUsd) return formatMoney(priceUsd);
-  return `${priceAmount} ${priceCurrency}`;
+  return formatListingPrice(priceUsd, priceAmount, priceCurrency, listingType);
 }
 
 function formatShortDate(iso: string | null): string {
@@ -203,19 +201,21 @@ function mapRecentSales(rows: Array<{
   priceUsd: { toString(): string } | null;
   priceAmount: { toString(): string };
   priceCurrency: string;
+  listingType: ListingItem["listingType"];
   sourcePlatform: string;
 }>): RecentSaleItem[] {
   return rows.map((row) => ({
     id: row.id,
-    title: row.title,
-    soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
-    priceDisplay: formatDisplayPrice(
-      row.priceUsd ? String(row.priceUsd) : null,
-      String(row.priceAmount),
-      row.priceCurrency,
-    ),
-    sourcePlatform: row.sourcePlatform,
-  }));
+      title: row.title,
+      soldAt: row.soldAt ? row.soldAt.toISOString() : row.lastPriceUpdateAt.toISOString(),
+      priceDisplay: formatDisplayPrice(
+        row.priceUsd ? String(row.priceUsd) : null,
+        String(row.priceAmount),
+        row.priceCurrency,
+        row.listingType,
+      ),
+      sourcePlatform: row.sourcePlatform,
+    }));
 }
 
 async function getRecentSales(listing: ListingItem): Promise<RecentSalesResult> {
@@ -264,7 +264,7 @@ export default async function LotPage({ params }: LotPageProps) {
   const title = listing?.title ?? "Featured Collectible";
   const grade = listing?.gradeValue || listing?.gradeNormalized || "Ungraded";
   const priceDisplay = listing
-    ? formatDisplayPrice(listing.priceUsd, listing.priceAmount, listing.priceCurrency)
+    ? formatDisplayPrice(listing.priceUsd, listing.priceAmount, listing.priceCurrency, listing.listingType)
     : "$0";
   const askUsd = listing?.priceUsd ? Number(listing.priceUsd) : Number.NaN;
 

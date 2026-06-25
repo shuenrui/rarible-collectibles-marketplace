@@ -226,7 +226,7 @@ export default function BuyOnRaribleButton({
   };
 
   const buttonLabel = (() => {
-    if (!authenticated) return "Connect to buy on Rarible";
+    if (!authenticated) return "Continue to secure checkout";
     if (state.kind === "working") return state.label;
     return "Buy on Rarible";
   })();
@@ -235,6 +235,13 @@ export default function BuyOnRaribleButton({
 
   return (
     <div className="space-y-3">
+      {!authenticated ? (
+        <div className="border border-white/10 bg-white/5 px-3 py-3 text-[11px] leading-relaxed text-white/65">
+          Pay by card or crypto. Ownership is tracked on-chain; your item stays vaulted until you redeem it.
+          Shipping and redemption fees apply. You will create a Rarible account via Google with Privy, so no separate wallet setup is required first.
+        </div>
+      ) : null}
+
       <button
         type="button"
         onClick={handleBuy}

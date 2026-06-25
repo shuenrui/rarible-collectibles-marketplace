@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { formatListingPrice } from "@/lib/pricing";
 
 type CollectionPageProps = {
   params: { slug: string };
@@ -104,6 +105,7 @@ export default async function CollectionPage({ params, searchParams }: Collectio
         priceAmount: true,
         priceCurrency: true,
         priceUsd: true,
+        listingType: true,
         sourcePlatform: true,
         sourceUrl: true,
         syncedAt: true,
@@ -303,9 +305,12 @@ export default async function CollectionPage({ params, searchParams }: Collectio
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {items.map((item) => {
               const grade = item.gradeValue || item.gradeNormalized || "—";
-              const price = item.priceUsd
-                ? `$${Number(item.priceUsd).toLocaleString()}`
-                : `${item.priceAmount.toString()} ${item.priceCurrency}`;
+              const price = formatListingPrice(
+                item.priceUsd?.toString() ?? null,
+                item.priceAmount.toString(),
+                item.priceCurrency,
+                item.listingType,
+              );
               const sourceLabel = PLATFORM_LABELS[item.sourcePlatform] ?? item.sourcePlatform;
 
               return (

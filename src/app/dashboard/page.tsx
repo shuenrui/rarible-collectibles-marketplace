@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import { formatListingPrice } from "@/lib/pricing";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ type CollectionItem = {
   priceAmount: string;
   priceCurrency: string;
   priceUsd: string | null;
+  listingType?: "fixed_price" | "auction" | "offer";
   sourcePlatform: string;
   sourceUrl: string;
   listingStatus: string;
@@ -265,7 +267,12 @@ function Stripe({ label = "" }: { label?: string }) {
 
 function WishCard({ item, onRemove }: { item: WishlistEntry; onRemove: () => void }) {
   const { listing } = item;
-  const price = listing.priceUsd ? `$${Number(listing.priceUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${listing.priceAmount} ${listing.priceCurrency}`;
+  const price = formatListingPrice(
+    listing.priceUsd,
+    listing.priceAmount,
+    listing.priceCurrency,
+    listing.listingType,
+  );
   const grade = listing.gradeValue || listing.gradeNormalized || "unknown";
   return (
     <div style={{ border: `1px solid ${LINE}`, background: PANEL2, display: "flex", flexDirection: "column", position: "relative" }}>
@@ -290,7 +297,12 @@ function WishCard({ item, onRemove }: { item: WishlistEntry; onRemove: () => voi
 }
 
 function CollectionCard({ item }: { item: CollectionItem }) {
-  const price = item.priceUsd ? `$${Number(item.priceUsd).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : `${item.priceAmount} ${item.priceCurrency}`;
+  const price = formatListingPrice(
+    item.priceUsd,
+    item.priceAmount,
+    item.priceCurrency,
+    item.listingType,
+  );
   const grade = item.gradeValue || item.gradeNormalized || "—";
   return (
     <div style={{ border: `1px solid ${LINE}`, background: PANEL2, display: "flex", flexDirection: "column" }}>

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
 import PackRipModal from "@/components/PackRipModal";
 import SellFlowModal from "@/components/SellFlowModal";
+import { formatListingPrice } from "@/lib/pricing";
 
 type FeaturedItem = {
   id: string;
@@ -13,6 +14,7 @@ type FeaturedItem = {
   priceAmount: string;
   priceCurrency: string;
   priceUsd: string | null;
+  listingType?: "fixed_price" | "auction" | "offer";
   sourcePlatform: string;
   gradeValue: string | null;
   gradeNormalized: string | null;
@@ -25,6 +27,7 @@ type HotItem = {
   priceAmount: string;
   priceCurrency: string;
   priceUsd: string | null;
+  listingType?: "fixed_price" | "auction" | "offer";
   sourcePlatform: string;
   gradeValue: string | null;
   gradeNormalized: string | null;
@@ -128,8 +131,12 @@ export default function Home() {
 
   const featuredPrice = useMemo(() => {
     if (!featured) return "—";
-    if (featured.priceUsd) return `$${Number(featured.priceUsd).toLocaleString()}`;
-    return `${featured.priceAmount} ${featured.priceCurrency}`;
+    return formatListingPrice(
+      featured.priceUsd,
+      featured.priceAmount,
+      featured.priceCurrency,
+      featured.listingType,
+    );
   }, [featured]);
 
   const featuredGrade = featured?.gradeValue || featured?.gradeNormalized || "UNKNOWN";
@@ -301,9 +308,12 @@ export default function Home() {
                 ))
               : hotItems.map((item) => {
                   const grade = item.gradeValue || item.gradeNormalized || "—";
-                  const price = item.priceUsd
-                    ? `$${Number(item.priceUsd).toLocaleString()}`
-                    : `${item.priceAmount} ${item.priceCurrency}`;
+                  const price = formatListingPrice(
+                    item.priceUsd,
+                    item.priceAmount,
+                    item.priceCurrency,
+                    item.listingType,
+                  );
 
                   return (
                     <Link key={item.id} href={`/collectibles/lot/${item.id}`} className="group overflow-hidden border-2 border-black bg-white transition hover:shadow-[0_4px_0_#FEDB02]">

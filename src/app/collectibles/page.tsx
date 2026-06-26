@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import ConnectButton from "@/components/ConnectButton";
 import WishlistButton from "@/components/WishlistButton";
@@ -23,6 +24,7 @@ type ListingItem = {
   syncConfidence: number;
   syncedAt: string;
   listedAt: string | null;
+  matchReason?: "Card name" | "Card number" | "Set" | "Description" | null;
 };
 
 function timeAgo(isoString: string): string {
@@ -61,6 +63,21 @@ function getPrimaryCtaLabel(listingType: ListingItem["listingType"]): string {
 }
 
 const PAGE_SIZE = 36;
+
+function normalizeTab(value: string | null): TabId {
+  if (value === "drops" || value === "packs" || value === "auctions" || value === "ending" || value === "new") {
+    return value;
+  }
+  return "buy";
+}
+
+function normalizeSort(value: string | null, tab: TabId): string {
+  if (value === "price_asc" || value === "price_desc" || value === "updated_desc") {
+    return value;
+  }
+  if (tab === "packs") return "price_asc";
+  return "updated_desc";
+}
 
 // IP category definitions with banner images, labels, and gradient fallbacks
 const IP_CATEGORIES: Record<string, { label: string; banner?: string; gradient: string }> = {
@@ -105,6 +122,18 @@ const IP_CATEGORIES: Record<string, { label: string; banner?: string; gradient: 
 
 export default function CollectiblesPage() {
   const { authenticated, user } = usePrivy();
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlSearchParams = useSearchParams();
+
+  const initialTab = normalizeTab(urlSearchParams.get("tab"));
+  const initialSort = normalizeSort(urlSearchParams.get("sort"), initialTab);
+  const initialCategory = urlSearchParams.get("category") || "all";
+  const initialQuery = urlSearchParams.get("q") || "";
+  const initialMinPrice = urlSearchParams.get("min_price_usd") || "";
+  const initialMaxPrice = urlSearchParams.get("max_price_usd") || "";
+  const initialGrade = urlSearchParams.get("grade") || "all";
+  const initialPlatform = urlSearchParams.get("source_platform") || "all";
 
   const [items, setItems] = useState<ListingItem[]>([]);
   const [categories, setCategories] = useState<Facet[]>([]);
@@ -113,28 +142,29 @@ export default function CollectiblesPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<TabId>("buy");
-  const [sort, setSort] = useState<string>("updated_desc");
+  const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const [sort, setSort] = useState<string>(initialSort);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [stateReady, setStateReady] = useState(false);
 
   // Search state
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(initialQuery);
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Price filter state
-  const [minPriceInput, setMinPriceInput] = useState("");
-  const [maxPriceInput, setMaxPriceInput] = useState("");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
+  const [minPriceInput, setMinPriceInput] = useState(initialMinPrice);
+  const [maxPriceInput, setMaxPriceInput] = useState(initialMaxPrice);
+  const [minPrice, setMinPrice] = useState(initialMinPrice);
+  const [maxPrice, setMaxPrice] = useState(initialMaxPrice);
 
   // Grade filter state
-  const [activeGrade, setActiveGrade] = useState<string>("all");
+  const [activeGrade, setActiveGrade] = useState<string>(initialGrade);
 
   // Platform filter state
-  const [activePlatform, setActivePlatform] = useState<string>("all");
+  const [activePlatform, setActivePlatform] = useState<string>(initialPlatform);
 
   // Mobile filter panel state
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -191,6 +221,30 @@ export default function CollectiblesPage() {
   const clearGradeFilter = () => setActiveGrade("all");
   const clearPlatformFilter = () => setActivePlatform("all");
 
+  useEffect(() => {
+    const nextTab = normalizeTab(urlSearchParams.get("tab"));
+    const nextSort = normalizeSort(urlSearchParams.get("sort"), nextTab);
+    const nextCategory = urlSearchParams.get("category") || "all";
+    const nextQuery = urlSearchParams.get("q") || "";
+    const nextMinPrice = urlSearchParams.get("min_price_usd") || "";
+    const nextMaxPrice = urlSearchParams.get("max_price_usd") || "";
+    const nextGrade = urlSearchParams.get("grade") || "all";
+    const nextPlatform = urlSearchParams.get("source_platform") || "all";
+
+    setActiveTab(nextTab);
+    setSort(nextSort);
+    setActiveCategory(nextCategory);
+    setSearchInput(nextQuery);
+    setSearchQuery(nextQuery);
+    setMinPriceInput(nextMinPrice);
+    setMaxPriceInput(nextMaxPrice);
+    setMinPrice(nextMinPrice);
+    setMaxPrice(nextMaxPrice);
+    setActiveGrade(nextGrade);
+    setActivePlatform(nextPlatform);
+    setStateReady(true);
+  }, [urlSearchParams]);
+
   const buildParams = useCallback(
     (page: number) => {
       const params = new URLSearchParams({
@@ -222,8 +276,43 @@ export default function CollectiblesPage() {
     [searchQuery, activeCategory, activeGrade, activePlatform, activeTab, sort, minPrice, maxPrice],
   );
 
+  useEffect(() => {
+    if (!stateReady) return;
+
+    const nextParams = new URLSearchParams();
+    if (searchQuery) nextParams.set("q", searchQuery);
+    if (activeCategory !== "all") nextParams.set("category", activeCategory);
+    if (activeGrade !== "all") nextParams.set("grade", activeGrade);
+    if (activePlatform !== "all") nextParams.set("source_platform", activePlatform);
+    if (minPrice) nextParams.set("min_price_usd", minPrice);
+    if (maxPrice) nextParams.set("max_price_usd", maxPrice);
+    if (activeTab !== "buy") nextParams.set("tab", activeTab);
+    if (sort !== normalizeSort(null, activeTab)) nextParams.set("sort", sort);
+
+    const current = urlSearchParams.toString();
+    const next = nextParams.toString();
+    if (current !== next) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+    }
+  }, [
+    activeCategory,
+    activeGrade,
+    activePlatform,
+    activeTab,
+    maxPrice,
+    minPrice,
+    pathname,
+    router,
+    searchQuery,
+    sort,
+    stateReady,
+    urlSearchParams,
+  ]);
+
   // Initial / filter-changed load (resets to page 1)
   useEffect(() => {
+    if (!stateReady) return;
+
     async function load() {
       setLoading(true);
       setCurrentPage(1);
@@ -246,7 +335,7 @@ export default function CollectiblesPage() {
       setLoading(false);
     }
     load().catch(() => setLoading(false));
-  }, [activeCategory, activeTab, sort, searchQuery, minPrice, maxPrice, buildParams]);
+  }, [activeCategory, activeGrade, activePlatform, activeTab, sort, searchQuery, minPrice, maxPrice, buildParams, stateReady]);
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -852,6 +941,13 @@ export default function CollectiblesPage() {
                         <h3 className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-tight text-neutral-500">
                           {item.title}
                         </h3>
+                        {searchQuery && item.matchReason && (
+                          <div className="mt-2">
+                            <span className="inline-flex border border-[#FEDB02]/50 bg-[#FEDB02]/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-[#A68C00]">
+                              {item.matchReason}
+                            </span>
+                          </div>
+                        )}
                         {/* 4 — Source (quiet trust-mark) */}
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-[11px] font-semibold text-neutral-400">

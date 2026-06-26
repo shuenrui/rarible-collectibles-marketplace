@@ -13,6 +13,74 @@ function getTimestampScore(item: { listedAt: Date | null; syncedAt: Date }) {
   return item.listedAt?.getTime() ?? item.syncedAt.getTime();
 }
 
+type SearchMatchReason = "Card name" | "Card number" | "Set" | "Description" | null;
+
+function normalizeSearchText(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function tokenizeSearchText(value: string) {
+  return normalizeSearchText(value).split(/\s+/).filter(Boolean);
+}
+
+function getSearchMatchReason(
+  item: {
+    title: string;
+    cardNumber: string | null;
+    setName: string | null;
+    description: string | null;
+  },
+  query: string,
+): SearchMatchReason {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return null;
+
+  const queryTokens = tokenizeSearchText(query);
+  const title = normalizeSearchText(item.title);
+  const cardNumber = normalizeSearchText(item.cardNumber);
+  const setName = normalizeSearchText(item.setName);
+  const description = normalizeSearchText(item.description);
+
+  if (cardNumber && cardNumber === normalizedQuery) return "Card number";
+  if (title && title === normalizedQuery) return "Card name";
+  if (title && title.startsWith(normalizedQuery)) return "Card name";
+  if (title && queryTokens.length > 1 && queryTokens.every((token) => title.includes(token))) {
+    return "Card name";
+  }
+  if (setName && (setName === normalizedQuery || setName.includes(normalizedQuery))) return "Set";
+  if (description && description.includes(normalizedQuery)) return "Description";
+  return null;
+}
+
+function getSearchMatchScore(
+  item: {
+    title: string;
+    cardNumber: string | null;
+    setName: string | null;
+    description: string | null;
+  },
+  query: string,
+) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return 0;
+
+  const queryTokens = tokenizeSearchText(query);
+  const title = normalizeSearchText(item.title);
+  const cardNumber = normalizeSearchText(item.cardNumber);
+  const setName = normalizeSearchText(item.setName);
+  const description = normalizeSearchText(item.description);
+
+  if (cardNumber && cardNumber === normalizedQuery) return 500;
+  if (title && title === normalizedQuery) return 450;
+  if (title && title.startsWith(normalizedQuery)) return 420;
+  if (title && queryTokens.length > 1 && queryTokens.every((token) => title.includes(token))) return 380;
+  if (title && title.includes(normalizedQuery)) return 320;
+  if (setName && setName === normalizedQuery) return 260;
+  if (setName && setName.includes(normalizedQuery)) return 220;
+  if (description && description.includes(normalizedQuery)) return 140;
+  return 0;
+}
+
 function softDiversifyBySource<T extends { sourcePlatform: string; listedAt: Date | null; syncedAt: Date }>(
   itemsBySource: T[][],
   pageSize: number,
@@ -164,6 +232,7 @@ export async function GET(req: NextRequest) {
   const select = {
     id: true,
     title: true,
+    description: true,
     imageUrl: true,
     gradeValue: true,
     gradeNormalized: true,
@@ -175,6 +244,9 @@ export async function GET(req: NextRequest) {
     sourceUrl: true,
     listingStatus: true,
     categoryL1: true,
+    franchise: true,
+    setName: true,
+    cardNumber: true,
     syncConfidence: true,
     vaulted: true,
     redeemable: true,
@@ -196,7 +268,35 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    items = shouldDiversifyAll
+    items = q
+      ? await (async () => {
+          const take = Math.min(Math.max(page * pageSize * 6, 120), 300);
+          const searchRows = await prisma.collectibleListing.findMany({
+            where,
+            orderBy: [{ listedAt: "desc" }, { syncedAt: "desc" }],
+            take,
+            select,
+          });
+
+          const ranked = searchRows
+            .map((item) => ({
+              item,
+              matchReason: getSearchMatchReason(item, q),
+              score: getSearchMatchScore(item, q),
+            }))
+            .filter((entry) => entry.score > 0)
+            .sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score;
+              return getTimestampScore(b.item) - getTimestampScore(a.item);
+            });
+
+          const start = (page - 1) * pageSize;
+          return ranked.slice(start, start + pageSize).map((entry) => ({
+            ...entry.item,
+            matchReason: entry.matchReason,
+          }));
+        })()
+      : shouldDiversifyAll
       ? await (async () => {
           const sourceRows = await prisma.collectibleListing.groupBy({
             by: ["sourcePlatform"],
@@ -237,9 +337,28 @@ export async function GET(req: NextRequest) {
       take: pageSize * 5,
       select,
     });
-    items = raw
-      .filter((r) => r.listingStatus === status)
-      .slice(0, pageSize);
+    if (q) {
+      const filtered = raw.filter((r) => r.listingStatus === status);
+      const ranked = filtered
+        .map((item) => ({
+          item,
+          matchReason: getSearchMatchReason(item, q),
+          score: getSearchMatchScore(item, q),
+        }))
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return getTimestampScore(b.item) - getTimestampScore(a.item);
+        });
+      items = ranked.slice(0, pageSize).map((entry) => ({
+        ...entry.item,
+        matchReason: entry.matchReason,
+      })) as ListingRow[];
+    } else {
+      items = raw
+        .filter((r) => r.listingStatus === status)
+        .slice(0, pageSize);
+    }
   }
 
   return NextResponse.json({
@@ -249,6 +368,7 @@ export async function GET(req: NextRequest) {
       priceUsd: item.priceUsd?.toString() ?? null,
       syncedAt: item.syncedAt.toISOString(),
       listedAt: item.listedAt?.toISOString() ?? null,
+      matchReason: "matchReason" in item ? item.matchReason : null,
     })),
     pagination: {
       page,

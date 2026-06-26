@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import ConnectButton from "@/components/ConnectButton";
 import WishlistButton from "@/components/WishlistButton";
+import CollectibleImage from "@/components/CollectibleImage";
 import { formatListingPrice } from "@/lib/pricing";
 
 type ListingItem = {
@@ -905,14 +906,11 @@ function CollectiblesPageInner() {
                     <Link href={`/collectibles/lot/${item.id}`} className="block">
                       {/* 1 — Image */}
                       <div className="relative aspect-[3/4] bg-neutral-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <CollectibleImage
                           src={item.imageUrl}
                           alt={item.title}
+                          title={item.title}
                           className="h-full w-full object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = "https://placehold.co/600x800/png?text=No+Image";
-                          }}
                         />
                         {/* 2 — Grade badge */}
                         <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">

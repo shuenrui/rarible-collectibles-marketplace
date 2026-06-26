@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
 import PackRipModal from "@/components/PackRipModal";
 import SellFlowModal from "@/components/SellFlowModal";
+import CollectibleImage from "@/components/CollectibleImage";
 import { formatListingPrice } from "@/lib/pricing";
 
 type FeaturedItem = {
@@ -318,10 +319,10 @@ export default function Home() {
                   return (
                     <Link key={item.id} href={`/collectibles/lot/${item.id}`} className="group overflow-hidden border-2 border-black bg-white transition hover:shadow-[0_4px_0_#FEDB02]">
                       <div className="relative aspect-[3/4] bg-neutral-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.imageUrl || "https://placehold.co/300x400/png?text=No+Image"}
+                        <CollectibleImage
+                          src={item.imageUrl}
                           alt={item.title}
+                          title={item.title}
                           className="h-full w-full object-cover"
                         />
                         <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">

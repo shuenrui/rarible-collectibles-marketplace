@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import CollectibleImage from "@/components/CollectibleImage";
 import { formatListingPrice } from "@/lib/pricing";
 
 type CollectionPageProps = {
@@ -317,8 +318,12 @@ export default async function CollectionPage({ params, searchParams }: Collectio
                 <article key={item.id} className="group overflow-hidden bg-white text-[#0A0A0A] transition hover:shadow-[0_6px_0_#FEDB02]">
                   <Link href={`/collectibles/lot/${item.id}`} className="block">
                     <div className="relative aspect-[3/4] bg-neutral-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                      <CollectibleImage
+                        src={item.imageUrl}
+                        alt={item.title}
+                        title={item.title}
+                        className="h-full w-full object-cover"
+                      />
                       <div className="absolute left-2 top-2 bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                         {grade}
                       </div>

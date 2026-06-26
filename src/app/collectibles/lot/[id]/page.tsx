@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import ConnectButton from "@/components/ConnectButton";
 import BuyOnRaribleButton from "@/components/BuyOnRaribleButton";
 import LotWishlistButton from "@/components/LotWishlistButton";
+import CollectibleImage from "@/components/CollectibleImage";
 import { formatListingPrice, formatUsdString } from "@/lib/pricing";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -322,10 +323,10 @@ export default async function LotPage({ params }: LotPageProps) {
       <section className="mx-auto grid w-full max-w-[1280px] gap-8 px-4 py-8 md:px-8 lg:grid-cols-[1fr_420px]">
         <article className="bg-[#111]">
           <div className="relative aspect-[3/4] bg-neutral-900">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={listing?.imageUrl ?? "https://placehold.co/600x800/png?text=No+Image"}
+            <CollectibleImage
+              src={listing?.imageUrl}
               alt={title}
+              title={title}
               className="h-full w-full object-cover"
             />
             <div className="absolute left-3 top-3 bg-black/80 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-sm">

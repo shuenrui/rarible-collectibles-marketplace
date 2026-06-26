@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import ConnectButton from "@/components/ConnectButton";
@@ -120,7 +120,7 @@ const IP_CATEGORIES: Record<string, { label: string; banner?: string; gradient: 
   },
 };
 
-export default function CollectiblesPage() {
+function CollectiblesPageInner() {
   const { authenticated, user } = usePrivy();
   const router = useRouter();
   const pathname = usePathname();
@@ -1018,5 +1018,13 @@ export default function CollectiblesPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function CollectiblesPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#0A0A0A] text-white" />}>
+      <CollectiblesPageInner />
+    </Suspense>
   );
 }

@@ -43,6 +43,7 @@ function timeAgo(isoString: string): string {
 
 type Facet = { value: string; count: number };
 type TabId = "buy" | "drops" | "packs" | "auctions" | "ending" | "new";
+type SortId = "price_asc" | "price_desc" | "updated_desc";
 
 const PLATFORM_LABELS: Record<string, string> = {
   courtyard: "Courtyard",
@@ -78,6 +79,23 @@ function normalizeSort(value: string | null, tab: TabId): string {
   }
   if (tab === "packs") return "price_asc";
   return "updated_desc";
+}
+
+function getDefaultSortForTab(tab: TabId): SortId {
+  if (tab === "packs" || tab === "ending") return "price_asc";
+  return "updated_desc";
+}
+
+function getSortLabel(sort: SortId) {
+  if (sort === "price_asc") return "LOWEST PRICE";
+  if (sort === "price_desc") return "HIGHEST PRICE";
+  return "NEWEST";
+}
+
+function getPacksSortDescription(sort: SortId) {
+  if (sort === "price_desc") return "Booster boxes, packs & sealed sets · highest price first";
+  if (sort === "updated_desc") return "Booster boxes, packs & sealed sets · newest listings first";
+  return "Booster boxes, packs & sealed sets · lowest price first";
 }
 
 // IP category definitions with banner images, labels, and gradient fallbacks
@@ -145,7 +163,7 @@ function CollectiblesPageInner() {
   const [hasMore, setHasMore] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
-  const [sort, setSort] = useState<string>(initialSort);
+  const [sort, setSort] = useState<SortId>(initialSort as SortId);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [stateReady, setStateReady] = useState(false);
@@ -233,7 +251,7 @@ function CollectiblesPageInner() {
     const nextPlatform = urlSearchParams.get("source_platform") || "all";
 
     setActiveTab(nextTab);
-    setSort(nextSort);
+    setSort(nextSort as SortId);
     setActiveCategory(nextCategory);
     setSearchInput(nextQuery);
     setSearchQuery(nextQuery);
@@ -366,6 +384,11 @@ function CollectiblesPageInner() {
     { id: "ending", label: "Ending Soon" },
     { id: "auctions", label: "Auctions" },
   ];
+
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    setSort(getDefaultSortForTab(tab));
+  };
 
   const hasPriceFilter = minPrice || maxPrice;
 
@@ -765,7 +788,7 @@ function CollectiblesPageInner() {
             <div className="flex items-center gap-2">
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value)}
+                onChange={(e) => setSort(e.target.value as SortId)}
                 className="border border-white/20 bg-[#111] px-3 py-2 font-mono text-[11px] font-bold tracking-widest text-white"
               >
                 <option value="updated_desc">NEWEST</option>
@@ -779,7 +802,7 @@ function CollectiblesPageInner() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`-mb-[2px] border-b-[3px] px-4 py-3 text-sm font-bold ${
                   activeTab === tab.id ? "border-[#FEDB02] text-white" : "border-transparent text-white/45"
                 }`}
@@ -818,7 +841,7 @@ function CollectiblesPageInner() {
                   <p className="font-mono text-[10px] font-bold tracking-[0.25em] text-emerald-400">📦 PACKS</p>
                   <h2 className="mt-1 text-xl font-black leading-tight text-white">Sealed Product Marketplace</h2>
                   <p className="mt-1 font-mono text-[11px] text-white/50">
-                    Booster boxes, packs &amp; sealed sets · sorted by price · find the best deal
+                    {getPacksSortDescription(sort)}
                   </p>
                 </div>
                 {!loading && (
@@ -832,14 +855,14 @@ function CollectiblesPageInner() {
                 {["price_asc", "price_desc", "updated_desc"].map((s) => (
                   <button
                     key={s}
-                    onClick={() => setSort(s)}
+                    onClick={() => setSort(s as SortId)}
                     className={`border px-3 py-1 font-mono text-[9px] font-bold tracking-widest ${
-                      sort === s || (activeTab === "packs" && s === "price_asc" && !["price_desc","updated_desc"].includes(sort))
+                      sort === s
                         ? "border-emerald-400 text-emerald-400"
                         : "border-white/20 text-white/40"
                     }`}
                   >
-                    {s === "price_asc" ? "LOWEST PRICE" : s === "price_desc" ? "HIGHEST PRICE" : "NEWEST"}
+                    {getSortLabel(s as SortId)}
                   </button>
                 ))}
               </div>
